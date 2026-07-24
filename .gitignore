@@ -1,0 +1,8 @@
+# Local editor files
+.vscode/
+.idea/
+*.swp
+*~
+
+# Local test output
+.tmp/
