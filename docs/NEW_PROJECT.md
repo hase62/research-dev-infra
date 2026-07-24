@@ -29,9 +29,11 @@ new-project Sepsis.Atlas --github my-organization/Sepsis.Atlas
 ├── PROJECT.md
 ├── README.md
 ├── .gitignore
+├── .vscode/extensions.json
 ├── analysis/
 ├── docs/
 ├── handoffs/
+│   └── CURRENT.md
 ├── scripts/
 │   └── setup-local-links.sh
 ├── tasks/
@@ -108,12 +110,18 @@ git push
 
 データ本体やsymlinkは `.local/`配下なのでcommitされません。`scripts/setup-local-links.sh`には共有Dropbox内の相対位置だけが残るため、別PCでも同じscriptを再実行できます。
 
-## 5. CodexまたはClaude Codeを起動する
+## 5. Visual Studio CodeからCodexまたはClaude Codeを起動する
 
 main working treeで単独作業する場合：
 
 ```bash
 cd ~/src/Sepsis.Atlas
+code .
+```
+
+VS Code統合terminalで：
+
+```bash
 codex
 ```
 
@@ -131,13 +139,16 @@ DropboxのResearch root
 DropboxのForShareLargeData root
 ```
 
-## 6. 独立したタスクはworktreeを使う
+## 6. 通常taskはshared worktreeを使う
 
 ```bash
-new-worktree Sepsis.Atlas codex task-001-qc-audit
-cd ~/worktrees/Sepsis.Atlas/codex-task-001-qc-audit
+new-worktree Sepsis.Atlas shared task-001-qc-audit
+cd ~/worktrees/Sepsis.Atlas/shared-task-001-qc-audit
+code .
 codex
 ```
+
+Codexの利用上限に達したら同じworktreeで停止し、`handoffs/CURRENT.md`とGit差分を確認してから `claude` を起動します。
 
 別Agentによるレビュー：
 

@@ -14,7 +14,11 @@ source "$SCRIPT_DIR/lib.sh"
 usage() {
   cat <<'USAGE'
 Usage:
-  remove-worktree PROJECT AGENT TASK [--delete-branch]
+  remove-worktree PROJECT MODE TASK [--delete-branch]
+
+Examples:
+  remove-worktree Sepsis.Atlas shared task-001-qc
+  remove-worktree Sepsis.Atlas codex experiment-001 --delete-branch
 USAGE
 }
 
@@ -24,7 +28,7 @@ USAGE
 }
 
 PROJECT="$1"
-AGENT="$2"
+MODE="$2"
 TASK="$3"
 DELETE_BRANCH=false
 
@@ -35,14 +39,19 @@ elif [[ $# -eq 4 ]]; then
 fi
 
 validate_name "$PROJECT" "Project name"
-validate_name "$AGENT" "Agent name"
+validate_name "$MODE" "Mode name"
 validate_name "$TASK" "Task name"
 load_research_env
 
 REPO="$SRC_ROOT/$PROJECT"
-WORKSPACE="$AGENT-$TASK"
+if [[ "$MODE" == "shared" ]]; then
+  WORKSPACE="shared-$TASK"
+  BRANCH="work/$TASK"
+else
+  WORKSPACE="$MODE-$TASK"
+  BRANCH="agent/$MODE/$TASK"
+fi
 TARGET="$WORKTREE_ROOT/$PROJECT/$WORKSPACE"
-BRANCH="agent/$AGENT/$TASK"
 
 [[ -d "$TARGET" ]] || fail "Worktree path was not found: $TARGET"
 

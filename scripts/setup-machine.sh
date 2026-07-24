@@ -100,6 +100,7 @@ ln -sfnT "$INFRA_ROOT/scripts/doctor.sh" "$HOME/.local/bin/research-doctor"
 ln -sfnT "$INFRA_ROOT/scripts/install-agents.sh" "$HOME/.local/bin/install-coding-agents"
 ln -sfnT "$INFRA_ROOT/scripts/install-miniforge.sh" "$HOME/.local/bin/install-miniforge"
 ln -sfnT "$INFRA_ROOT/scripts/analysis-smoke-test.sh" "$HOME/.local/bin/analysis-smoke-test"
+ln -sfnT "$INFRA_ROOT/scripts/setup-vscode.sh" "$HOME/.local/bin/setup-vscode"
 
 PATH_LINE='export PATH="$HOME/.local/bin:$PATH"'
 if ! grep -Fqx "$PATH_LINE" "$HOME/.bashrc" 2>/dev/null; then
@@ -114,3 +115,4 @@ echo "  Environment file:          $HOME/.research_env"
 echo
 echo "Run: source ~/.bashrc"
 echo "Then: research-doctor"
+echo "After installing Windows Visual Studio Code: setup-vscode"

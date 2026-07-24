@@ -14,9 +14,16 @@ source "$SCRIPT_DIR/lib.sh"
 usage() {
   cat <<'USAGE'
 Usage:
-  new-worktree PROJECT AGENT TASK [BASE]
+  new-worktree PROJECT MODE TASK [BASE]
+
+MODE may be:
+  shared   A switchable task worktree that can be used sequentially by Codex
+           and Claude Code. Recommended when switching after a usage limit.
+  codex    Agent-specific worktree.
+  claude   Agent-specific worktree.
 
 Examples:
+  new-worktree Sepsis.Atlas shared task-001-qc
   new-worktree Sepsis.Atlas codex task-001-qc
   new-worktree Sepsis.Atlas claude review-001-qc agent/codex/task-001-qc
 USAGE
@@ -28,19 +35,24 @@ USAGE
 }
 
 PROJECT="$1"
-AGENT="$2"
+MODE="$2"
 TASK="$3"
 BASE="${4:-main}"
 
 validate_name "$PROJECT" "Project name"
-validate_name "$AGENT" "Agent name"
+validate_name "$MODE" "Mode name"
 validate_name "$TASK" "Task name"
 load_research_env
 
 REPO="$SRC_ROOT/$PROJECT"
-WORKSPACE="$AGENT-$TASK"
+if [[ "$MODE" == "shared" ]]; then
+  WORKSPACE="shared-$TASK"
+  BRANCH="work/$TASK"
+else
+  WORKSPACE="$MODE-$TASK"
+  BRANCH="agent/$MODE/$TASK"
+fi
 TARGET="$WORKTREE_ROOT/$PROJECT/$WORKSPACE"
-BRANCH="agent/$AGENT/$TASK"
 
 [[ -d "$REPO/.git" ]] || fail "Git repository was not found: $REPO"
 [[ ! -e "$TARGET" ]] || fail "Worktree path already exists: $TARGET"
@@ -75,4 +87,11 @@ echo "  path:   $TARGET"
 echo
 echo "Start with:"
 echo "  cd '$TARGET'"
-echo "  $AGENT"
+echo "  code ."
+if [[ "$MODE" == "shared" ]]; then
+  echo "  then start either: codex"
+  echo "  or:                claude"
+  echo "  Do not run both against this worktree at the same time."
+else
+  echo "  $MODE"
+fi

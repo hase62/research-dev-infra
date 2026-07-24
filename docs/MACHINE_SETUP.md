@@ -5,6 +5,7 @@
 ## 前提
 
 - Windows 11とWSL2 Ubuntu
+- Windows版Visual Studio CodeとMicrosoft WSL extension
 - Windows側にDropbox desktop applicationが導入済み
 - Dropbox内に以下が存在する
   - `Research`
@@ -52,6 +53,22 @@ bash scripts/setup-machine.sh --local-root /mnt/e/ResearchLocal
 bash scripts/setup-machine.sh --local-root "$HOME/local-large"
 ```
 
+## Visual Studio Code
+
+Windows PowerShellでVS Codeを導入します。
+
+```powershell
+winget install --id Microsoft.VisualStudioCode -e
+```
+
+Ubuntuを開き直した後：
+
+```bash
+setup-vscode
+```
+
+projectはWSL terminalから `code .` で開きます。
+
 ## CodexとClaude Code
 
 ```bash
@@ -65,7 +82,7 @@ codex
 claude
 ```
 
-認証ディレクトリをDropboxやGitHubで同期しないでください。
+認証ディレクトリをDropboxやGitHubで同期しないでください。どちらかの利用上限に達したら、同じworktreeでsessionを停止し、`handoffs/CURRENT.md`とGit差分を確認してもう一方へ切り替えます。
 
 ## Miniforge
 

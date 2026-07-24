@@ -39,6 +39,17 @@ for command_name in gh conda mamba codex claude code; do
   fi
 done
 
+if command -v code >/dev/null 2>&1; then
+  extensions="$(code --list-extensions 2>/dev/null || true)"
+  for extension in ms-vscode-remote.remote-wsl openai.chatgpt anthropic.claude-code; do
+    if grep -Fqi "$extension" <<<"$extensions"; then
+      ok "VS Code extension: $extension"
+    else
+      warn "VS Code extension is not installed: $extension (run setup-vscode)"
+    fi
+  done
+fi
+
 
 if command -v git >/dev/null 2>&1; then
   git_name="$(git config --global user.name 2>/dev/null || true)"

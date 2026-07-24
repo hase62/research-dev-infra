@@ -51,8 +51,15 @@ if [[ "$YES" != true ]]; then
   }
 fi
 
+echo "==> Installing Codex CLI (non-interactive installer mode)"
 curl -fsSL https://chatgpt.com/codex/install.sh | CODEX_NON_INTERACTIVE=1 sh
+hash -r
+codex --version
+
+echo "==> Installing Claude Code (stable channel)"
 curl -fsSL https://claude.ai/install.sh | bash -s stable
+hash -r
+claude --version
 
 echo
 echo "Installation commands completed."

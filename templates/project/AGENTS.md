@@ -1,6 +1,6 @@
 # Codex instructions
 
-Read `PROJECT.md` before starting.
+Read `PROJECT.md` and `handoffs/CURRENT.md` before starting.
 
 ## Scope
 
@@ -15,3 +15,7 @@ Read `PROJECT.md` before starting.
 - Working outputs: `.local/output/`
 
 Follow all mandatory rules in `PROJECT.md`.
+
+## Agent switching
+
+This worktree may be continued later by Claude Code. Before making changes, inspect `git status` and `git diff`. Before handing off, update `handoffs/CURRENT.md` with completed work, remaining work, validation, and caveats. Do not run concurrently with Claude Code in the same worktree.

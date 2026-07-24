@@ -24,3 +24,5 @@ TODO: 現在の作業段階を記載する。
 - Do not read `.env`, credentials, tokens, or secret files.
 - Do not commit, push, merge, rebase, or delete data unless explicitly requested.
 - Inspect `git status` and `git diff` before completing a task.
+- Codex and Claude Code may continue the same task sequentially in the same worktree, but must not edit that worktree at the same time.
+- When handing work to the other agent, read and update `handoffs/CURRENT.md`; Git files and diffs are the source of truth, not chat history.

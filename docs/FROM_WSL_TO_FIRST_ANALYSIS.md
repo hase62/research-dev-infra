@@ -1,6 +1,6 @@
 # WSL2導入後から最初の解析まで
 
-この文書は、WSL2とUbuntuをインストールした直後から、GitHub、Dropbox、Miniforge、Codex、Claude Codeを準備し、最初の研究repositoryで解析を実行するまでの一本道です。
+この文書は、WSL2とUbuntuをインストールした直後から、GitHub、Dropbox、Visual Studio Code、Miniforge、Codex、Claude Codeを準備し、最初の研究repositoryで解析を実行するまでの一本道です。
 
 構成は次を前提とします。
 
@@ -9,7 +9,9 @@
 - Dropboxの既存構造は変更しない
 - 必要なDropboxディレクトリだけをprojectの `.local/data/` にsymlinkする
 - 大規模なPC固有データは `LocalLarge` から参照する
-- CodexとClaude Codeはproject rootまたはworktreeから起動する
+- Visual Studio Codeを共通の編集、Git、terminal画面として使う
+- CodexとClaude Codeは両方を導入し、project rootまたはworktreeから起動する
+- 一方の利用上限に達したら、同じworktreeで停止してもう一方へ切り替える
 
 ---
 
@@ -256,16 +258,29 @@ claude
 
 ---
 
-## 8. 任意：VS CodeをWSLへ接続する
+## 8. Visual Studio CodeをWSLへ接続する
 
-Windows側にVS CodeとWSL extensionを導入した後、Ubuntuでproject directoryから実行します。
+Windows PowerShellでWindows版Visual Studio Codeを導入します。
+
+```powershell
+winget install --id Microsoft.VisualStudioCode -e
+```
+
+Ubuntuを開き直し、infraのhelperで公式extensionを導入します。
+
+```bash
+code --version
+setup-vscode
+```
+
+その後、Ubuntuでproject directoryから実行します。
 
 ```bash
 cd ~/src/research-dev-infra
 code .
 ```
 
-画面左下がWSL接続になっていることを確認します。Windows側から `\\wsl$` 経由で直接編集するのではなく、Remote WSLとして開きます。
+画面左下がWSL接続になっていることを確認します。Windows側から `\\wsl$` 経由で直接編集するのではなく、WSL extension経由で開きます。CodexとClaude CodeはVS Codeの統合terminalまたは公式extensionから利用できます。
 
 Dockerは必要なprojectで後から導入します。最初の解析開始には必須ではありません。
 
@@ -471,10 +486,16 @@ git push
 
 ## 13. CodexまたはClaude Codeで作業を開始する
 
-単独の小さな作業ならmain repositoryから開始できます。
+単独の小さな作業ならmain repositoryをVS Codeで開いて開始できます。
 
 ```bash
 cd ~/src/ProteomicAging
+code .
+```
+
+VS Codeの統合terminalで：
+
+```bash
 conda activate proteomic-aging
 codex
 ```
@@ -495,13 +516,25 @@ PROJECT.mdを読み、現在のrepository構造と.local/dataの利用可能な�
 commitやpushは行わないでください。
 ```
 
-並列タスクや独立レビューではworktreeを使います。
+通常のtaskは、CodexとClaude Codeを順次切り替えられるshared worktreeを使います。
 
 ```bash
-new-worktree ProteomicAging codex task-001-data-inventory
-cd ~/worktrees/ProteomicAging/codex-task-001-data-inventory
+new-worktree ProteomicAging shared task-001-data-inventory
+cd ~/worktrees/ProteomicAging/shared-task-001-data-inventory
+code .
+```
+
+VS Codeの統合terminalで一方を起動します。
+
+```bash
 conda activate proteomic-aging
 codex
+```
+
+利用上限に達したら同じworktreeで停止し、`handoffs/CURRENT.md`、`git status`、`git diff`を確認してからもう一方を起動します。
+
+```bash
+claude
 ```
 
 ---
@@ -518,6 +551,7 @@ cd research-dev-infra
 
 bash scripts/setup-machine.sh --local-root /mnt/d/ResearchLocal
 source ~/.bashrc
+setup-vscode
 install-miniforge
 install-coding-agents
 research-doctor
@@ -551,6 +585,8 @@ mamba env create -f environment.yml
 cd ~/src/ProteomicAging
 git fetch --all --prune
 git pull --rebase
+code .
+# VS Code統合terminalで
 conda activate proteomic-aging
 research-doctor ProteomicAging
 ```
@@ -566,3 +602,39 @@ git push
 ```
 
 Dropboxはデータ参照、GitHubはコード同期です。DropboxをGit repositoryの同期手段にしません。
+
+
+## Codex installerで起動を選び、Claudeが入らなかった場合
+
+古い `install-agents.sh` ではCodex installerが対話モードで動き、
+`Start Codex now?` に `y` と答えると、後続のClaude Code installerへ
+到達しないことがありました。Codexが入っていてClaudeだけ未導入なら、次を実行します。
+
+```bash
+curl -fsSL https://claude.ai/install.sh | bash -s stable
+hash -r
+claude --version
+```
+
+現在のscriptはCodex installerを `CODEX_NON_INTERACTIVE=1` で実行し、
+インストール中にCodexを自動起動しません。
+
+
+## CodexとClaude Codeの利用上限で切り替える場合
+
+両者の会話履歴は共有されませんが、同じworktreeのfileとGit差分は共有されます。現在のsessionを止め、同時実行しない状態で次を確認します。
+
+```bash
+git status --short
+git diff --stat
+```
+
+`handoffs/CURRENT.md`へ完了内容、次の作業、test結果を書き、同じdirectoryで別のagentを起動します。
+
+```bash
+claude
+# または
+codex
+```
+
+新しいagentには最初に `PROJECT.md`、`handoffs/CURRENT.md`、`git status`、`git diff`を読ませます。

@@ -108,6 +108,7 @@ echo "  cd '$PROJECT_DIR'"
 echo "  edit PROJECT.md"
 echo "  edit scripts/setup-local-links.sh"
 echo "  setup-project-links"
+echo "  code ."
 if [[ "$CREATE_GITHUB" != true ]]; then
   echo "  connect the repository to GitHub when ready"
 fi
