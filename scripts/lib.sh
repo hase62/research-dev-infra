@@ -28,7 +28,6 @@ load_research_env() {
   : "${SCRATCH_ROOT:?SCRATCH_ROOT is not set}"
   : "${RESEARCH_ROOT:?RESEARCH_ROOT is not set}"
   : "${LARGE_ROOT:?LARGE_ROOT is not set}"
-  : "${LOCAL_ROOT:?LOCAL_ROOT is not set}"
 }
 
 validate_name() {

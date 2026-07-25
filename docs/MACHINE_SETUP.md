@@ -5,7 +5,6 @@
 ## 前提
 
 - Windows 11とWSL2 Ubuntu
-- Windows版Visual Studio CodeとMicrosoft WSL extension
 - Windows側にDropbox desktop applicationが導入済み
 - Dropbox内に以下が存在する
   - `Research`
@@ -17,57 +16,29 @@
 ```bash
 mkdir -p ~/src
 cd ~/src
-git clone git@github.com:<YOUR_ACCOUNT>/research-dev-infra.git
+git clone https://github.com/<YOUR_ACCOUNT>/research-dev-infra.git
 cd research-dev-infra
 bash scripts/setup-machine.sh
 source ~/.bashrc
 research-doctor
 ```
 
-`setup-machine.sh`は次を行います。
+`setup-machine.sh`は次だけを行います。
 
 1. `~/src`、`~/worktrees`、`~/scratch`、`~/data-roots`を作成
 2. Dropboxの `Research` と `ForShareLargeData` へのsymlinkを作成
-3. PC固有の大容量領域 `LocalLarge` へのsymlinkを作成
-4. `~/.research_env`を作成
-5. `~/.bashrc`から `~/.research_env`を読み込む設定を追加
-6. 共通コマンドを `~/.local/bin` に登録
+3. `~/.research_env`を作成
+4. `~/.bashrc`から `~/.research_env`を読み込む設定を追加
+5. 共通コマンドを `~/.local/bin` に登録
 
-## PCごとに異なるLocalLarge
+PC全体で共通の `D:\ResearchLocal` のような大容量ルートは作りません。ローカルSSDや外付けディスクが必要な研究だけ、各projectの `scripts/setup-local-links.sh` で任意の実パスを直接linkします。
 
-Dドライブを使用する例：
-
-```bash
-bash scripts/setup-machine.sh --local-root /mnt/d/ResearchLocal
-```
-
-外付けSSDを使用する例：
+例：
 
 ```bash
-bash scripts/setup-machine.sh --local-root /mnt/e/ResearchLocal
+link_data "/mnt/e/ProteomicAging/raw" raw
+use_output_dir "/mnt/e/ProteomicAging/results/$WORKSPACE_NAME"
 ```
-
-ローカル大容量領域を使わないPCでは、WSL内を指定できます。
-
-```bash
-bash scripts/setup-machine.sh --local-root "$HOME/local-large"
-```
-
-## Visual Studio Code
-
-Windows PowerShellでVS Codeを導入します。
-
-```powershell
-winget install --id Microsoft.VisualStudioCode -e
-```
-
-Ubuntuを開き直した後：
-
-```bash
-setup-vscode
-```
-
-projectはWSL terminalから `code .` で開きます。
 
 ## CodexとClaude Code
 
@@ -82,7 +53,7 @@ codex
 claude
 ```
 
-認証ディレクトリをDropboxやGitHubで同期しないでください。どちらかの利用上限に達したら、同じworktreeでsessionを停止し、`handoffs/CURRENT.md`とGit差分を確認してもう一方へ切り替えます。
+認証ディレクトリをDropboxやGitHubで同期しないでください。
 
 ## Miniforge
 

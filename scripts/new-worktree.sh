@@ -76,9 +76,9 @@ if [[ -x "$TARGET/scripts/setup-local-links.sh" ]]; then
   PROJECT_ROOT="$TARGET" WORKSPACE_NAME="$WORKSPACE" bash "$TARGET/scripts/setup-local-links.sh"
 elif [[ -d "$REPO/.local/data" ]]; then
   cp -a "$REPO/.local/data/." "$TARGET/.local/data/"
-  mkdir -p "$SCRATCH_ROOT/$PROJECT/$WORKSPACE" "$LOCAL_ROOT/$PROJECT/results/$WORKSPACE"
-  ln -sfnT "$SCRATCH_ROOT/$PROJECT/$WORKSPACE" "$TARGET/.local/scratch"
-  ln -sfnT "$LOCAL_ROOT/$PROJECT/results/$WORKSPACE" "$TARGET/.local/output"
+  mkdir -p "$SCRATCH_ROOT/$PROJECT/$WORKSPACE/scratch" "$SCRATCH_ROOT/$PROJECT/$WORKSPACE/output"
+  ln -sfnT "$SCRATCH_ROOT/$PROJECT/$WORKSPACE/scratch" "$TARGET/.local/scratch"
+  ln -sfnT "$SCRATCH_ROOT/$PROJECT/$WORKSPACE/output" "$TARGET/.local/output"
 fi
 
 info "Worktree created"

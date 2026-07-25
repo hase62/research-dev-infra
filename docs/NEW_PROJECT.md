@@ -29,22 +29,20 @@ new-project Sepsis.Atlas --github my-organization/Sepsis.Atlas
 ├── PROJECT.md
 ├── README.md
 ├── .gitignore
-├── .vscode/extensions.json
 ├── analysis/
 ├── docs/
 ├── handoffs/
-│   └── CURRENT.md
 ├── scripts/
 │   └── setup-local-links.sh
 ├── tasks/
 ├── tests/
 └── .local/
     ├── data/
-    ├── output -> LocalLargeまたはscratch
-    └── scratch -> ~/scratch/Sepsis.Atlas/main
+    ├── output -> ~/scratch/Sepsis.Atlas/main/output
+    └── scratch -> ~/scratch/Sepsis.Atlas/main/scratch
 ```
 
-`.local/`はGit管理されません。
+`.local/`はGit管理されません。標準ではscratchとworking outputをWSL内へ置きます。
 
 ## 2. PROJECT.mdを書く
 
@@ -75,14 +73,24 @@ nano scripts/setup-local-links.sh
 ```bash
 link_data "$RESEARCH_ROOT/Papers/Aging/Proteomics" papers
 link_data "$LARGE_ROOT/Proteomics/PublicData" public_data
-link_data "$LOCAL_ROOT/ProteomicAging/large_objects" large_objects
 ```
 
-絶対パスを直接書く代わりに、次のroot変数を使います。
+PC固有のローカルSSDや外付けディスクを使う研究では、その実パスを直接指定します。
+
+```bash
+link_data "/mnt/e/ProteomicAging/large_objects" large_objects
+```
+
+working outputも外部ディスクへ置きたいprojectだけ、次を追加します。
+
+```bash
+use_output_dir "/mnt/e/ProteomicAging/results/$WORKSPACE_NAME"
+```
+
+共通root変数は次の2つだけです。
 
 - `$RESEARCH_ROOT`
 - `$LARGE_ROOT`
-- `$LOCAL_ROOT`
 
 反映：
 
@@ -108,9 +116,9 @@ git commit -m "Configure project and local data links"
 git push
 ```
 
-データ本体やsymlinkは `.local/`配下なのでcommitされません。`scripts/setup-local-links.sh`には共有Dropbox内の相対位置だけが残るため、別PCでも同じscriptを再実行できます。
+データ本体やsymlinkは `.local/`配下なのでcommitされません。`scripts/setup-local-links.sh`にはDropboxの共通パスや、必要なproject固有のローカルパスだけが残ります。
 
-## 5. Visual Studio CodeからCodexまたはClaude Codeを起動する
+## 5. CodexまたはClaude Codeを起動する
 
 main working treeで単独作業する場合：
 
@@ -119,61 +127,39 @@ cd ~/src/Sepsis.Atlas
 code .
 ```
 
-VS Code統合terminalで：
+VS Codeのterminalから、どちらか一方を起動します。
 
 ```bash
 codex
 ```
 
 ```bash
-cd ~/src/Sepsis.Atlas
 claude
 ```
 
-Agentは必ずproject rootまたはそのworktreeから起動します。次の場所からは起動しません。
+Agentは必ずproject rootまたはそのworktreeから起動します。
 
-```text
-~/src
-~/data-roots
-DropboxのResearch root
-DropboxのForShareLargeData root
-```
-
-## 6. 通常taskはshared worktreeを使う
+## 6. 切替可能なtask worktreeを使う
 
 ```bash
 new-worktree Sepsis.Atlas shared task-001-qc-audit
 cd ~/worktrees/Sepsis.Atlas/shared-task-001-qc-audit
 code .
-codex
 ```
 
-Codexの利用上限に達したら同じworktreeで停止し、`handoffs/CURRENT.md`とGit差分を確認してから `claude` を起動します。
-
-別Agentによるレビュー：
-
-```bash
-new-worktree \
-  Sepsis.Atlas \
-  claude \
-  review-001-qc-audit \
-  agent/codex/task-001-qc-audit
-
-cd ~/worktrees/Sepsis.Atlas/claude-review-001-qc-audit
-claude
-```
+CodexまたはClaude Codeを起動し、一方の利用上限に達したら同じworktreeで他方へ切り替えます。同時には起動しません。
 
 ## 7. 別PCで再開する
 
 ```bash
 cd ~/src
-git clone git@github.com:<ACCOUNT>/Sepsis.Atlas.git
+gh repo clone <ACCOUNT>/Sepsis.Atlas
 cd Sepsis.Atlas
 setup-project-links
 research-doctor Sepsis.Atlas
 ```
 
-Dropbox内の必要なファイルをそのPCでローカル保存状態にしてから解析を開始します。
+Dropbox内の必要なファイルをそのPCでローカル保存状態にします。project固有の外部ディスクパスがPCごとに異なる場合は、そのPCで `scripts/setup-local-links.sh` を調整するか、リンクを手動で作ります。
 
 ## WSL2導入直後から始める場合
 

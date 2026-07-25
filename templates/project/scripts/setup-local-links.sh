@@ -22,8 +22,9 @@ fi
 WORKSPACE_NAME="${WORKSPACE_NAME:-main}"
 printf '%s\n' "$WORKSPACE_NAME" > "$PROJECT_ROOT/.local/workspace-name"
 
-SCRATCH_DIR="$SCRATCH_ROOT/$PROJECT_NAME/$WORKSPACE_NAME"
-OUTPUT_DIR="$LOCAL_ROOT/$PROJECT_NAME/results/$WORKSPACE_NAME"
+WORKSPACE_DIR="$SCRATCH_ROOT/$PROJECT_NAME/$WORKSPACE_NAME"
+SCRATCH_DIR="$WORKSPACE_DIR/scratch"
+OUTPUT_DIR="$WORKSPACE_DIR/output"
 
 mkdir -p "$SCRATCH_DIR" "$OUTPUT_DIR"
 ln -sfnT "$SCRATCH_DIR" "$PROJECT_ROOT/.local/scratch"
@@ -45,16 +46,27 @@ link_data() {
   fi
 }
 
+use_output_dir() {
+  local source_path="$1"
+  mkdir -p "$source_path"
+  OUTPUT_DIR="$source_path"
+  ln -sfnT "$OUTPUT_DIR" "$PROJECT_ROOT/.local/output"
+}
+
 # -----------------------------------------------------------------------------
 # Project-specific data links
 #
-# Add only the Dropbox or local directories needed by this project.
+# Add only the Dropbox or arbitrary local directories needed by this project.
 # Keep Dropbox's existing directory structure unchanged.
+# There is intentionally no machine-wide LOCAL_ROOT.
 #
 # Examples:
 # link_data "$RESEARCH_ROOT/Papers/ExampleProject" papers
 # link_data "$LARGE_ROOT/ExampleData/processed" processed_data
-# link_data "$LOCAL_ROOT/$PROJECT_NAME/raw" raw
+# link_data "/mnt/e/MyProject/raw" raw
+#
+# Optional: persist working outputs outside WSL scratch for this project only.
+# use_output_dir "/mnt/e/MyProject/results/$WORKSPACE_NAME"
 # -----------------------------------------------------------------------------
 
 

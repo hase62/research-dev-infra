@@ -69,7 +69,7 @@ if command -v gh >/dev/null 2>&1; then
   fi
 fi
 
-for variable_name in RESEARCH_ROOT LARGE_ROOT LOCAL_ROOT SRC_ROOT WORKTREE_ROOT SCRATCH_ROOT; do
+for variable_name in RESEARCH_ROOT LARGE_ROOT SRC_ROOT WORKTREE_ROOT SCRATCH_ROOT; do
   value="${!variable_name:-}"
   if [[ -n "$value" && -e "$value" ]]; then
     ok "$variable_name -> $value"

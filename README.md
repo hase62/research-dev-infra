@@ -49,11 +49,11 @@ WSL2、GitHub、Visual Studio Code、Codex、Claude Code、Miniforge、既存Dro
 └── data-roots/
     ├── Research
     │   -> /mnt/c/Users/<WindowsUser>/Dropbox/Research
-    ├── ForShareLargeData
-    │   -> /mnt/c/Users/<WindowsUser>/Dropbox/ForShareLargeData
-    └── LocalLarge
-        -> /mnt/d/ResearchLocal など
+    └── ForShareLargeData
+        -> /mnt/c/Users/<WindowsUser>/Dropbox/ForShareLargeData
 ```
+
+PC全体で共通の大容量ローカルディスクは定義しません。必要なprojectだけが、任意の `/mnt/d/...`、`/mnt/e/...`、外付けSSD、HPC mountなどを直接参照します。
 
 各projectは次の最小構成を持ちます。
 
@@ -64,20 +64,22 @@ WSL2、GitHub、Visual Studio Code、Codex、Claude Code、Miniforge、既存Dro
 ├── CLAUDE.md
 ├── README.md
 ├── .vscode/
-│   └── extensions.json     # 推奨extension
+│   └── extensions.json
 ├── analysis/
 ├── docs/
 ├── tasks/
 ├── tests/
 ├── handoffs/
-│   └── CURRENT.md          # Codex/Claude間の短い引継ぎ
+│   └── CURRENT.md
 ├── scripts/
 │   └── setup-local-links.sh
 └── .local/                 # Git管理しない
     ├── data/               # 必要な入力データへのsymlink
-    ├── scratch/            # WSL2内のtask用一時領域
-    └── output/             # PCローカルの作業成果物
+    ├── scratch/            # task用一時領域
+    └── output/             # task用working output
 ```
+
+標準ではscratchとoutputは `~/scratch/<Project>/<Workspace>/` 以下です。外部ディスクへ置きたいprojectだけ `use_output_dir` で差し替えます。
 
 ---
 
@@ -285,7 +287,7 @@ gh repo view --json url --jq '.url'
 
 ---
 
-## 7. Dropboxとローカル大容量領域を設定する
+## 7. Dropboxの共通参照ルートを設定する
 
 本構成は、Dropbox内の次の2ルートを既存構造のまま参照します。
 
@@ -294,26 +296,11 @@ C:\Users\<WindowsUser>\Dropbox\Research
 C:\Users\<WindowsUser>\Dropbox\ForShareLargeData
 ```
 
-PC固有の大容量データは、例として次へ置きます。
-
-```text
-D:\ResearchLocal
-```
-
-WSL2側で作成します。
-
-```bash
-mkdir -p /mnt/d/ResearchLocal
-```
-
 マシン設定を実行します。
 
 ```bash
 cd ~/src/research-dev-infra
-
-bash scripts/setup-machine.sh \
-  --local-root /mnt/d/ResearchLocal
-
+bash scripts/setup-machine.sh
 source ~/.bashrc
 ```
 
@@ -322,17 +309,7 @@ Windowsユーザー名やDropbox位置を自動検出できない場合：
 ```bash
 bash scripts/setup-machine.sh \
   --windows-user <WindowsUser> \
-  --dropbox-home "/mnt/c/Users/<WindowsUser>/Dropbox" \
-  --local-root /mnt/d/ResearchLocal
-
-source ~/.bashrc
-```
-
-Dドライブを使わないPCでは、WSL2内に作ることもできます。
-
-```bash
-bash scripts/setup-machine.sh \
-  --local-root "$HOME/local-large"
+  --dropbox-home "/mnt/c/Users/<WindowsUser>/Dropbox"
 
 source ~/.bashrc
 ```
@@ -346,6 +323,8 @@ research-doctor
 ```
 
 `~/.research_env`はPC固有ファイルです。GitHubやDropboxで同期しません。
+
+`setup-machine.sh`はローカルSSDや外付けディスクを作成・登録しません。それらはprojectごとに必要性も場所も異なるため、各projectの `scripts/setup-local-links.sh` で直接指定します。
 
 ---
 
@@ -372,8 +351,7 @@ code --version
 ```bash
 cd ~/src/research-dev-infra
 
-bash scripts/setup-machine.sh \
-  --local-root /mnt/d/ResearchLocal
+bash scripts/setup-machine.sh
 
 source ~/.bashrc
 hash -r
@@ -381,7 +359,7 @@ command -v setup-vscode
 setup-vscode
 ```
 
-Dドライブを使わないPCでは、初回に指定したものと同じ`--local-root`を指定します。command登録前でも、scriptを直接実行できます。
+command登録前でも、scriptを直接実行できます。
 
 ```bash
 cd ~/src/research-dev-infra
@@ -524,7 +502,6 @@ research-doctor
 - Git / curl / bash
 - GitHub CLIの認証
 - Dropboxの2ルート
-- LocalLarge
 - `~/src` / `~/worktrees` / `~/scratch`
 - Miniforge / conda / mamba
 - Codex / Claude Code
@@ -631,7 +608,18 @@ nano scripts/setup-local-links.sh
 ```bash
 link_data "$RESEARCH_ROOT/Papers/Aging/Proteomics" papers
 link_data "$LARGE_ROOT/Proteomics/PublicData" public_data
-link_data "$LOCAL_ROOT/ProteomicAging/large_objects" large_objects
+```
+
+project固有のローカルSSDや外付けディスクが必要な場合は、その実パスを直接指定します。
+
+```bash
+link_data "/mnt/e/ProteomicAging/large_objects" large_objects
+```
+
+working outputも外部ディスクへ置きたいprojectだけ、次を追加します。
+
+```bash
+use_output_dir "/mnt/e/ProteomicAging/results/$WORKSPACE_NAME"
 ```
 
 実際のDropbox構造に合わせて変更します。Dropbox内をprojectごとに再編成する必要はありません。
@@ -997,7 +985,7 @@ git push
 
 未commit、未pushの状態で別PCへ移らないことを原則とします。
 
-データ本体はGitHubではなく、Dropbox、LocalLarge、HPCのいずれかにあります。別PCで同じデータが必要なら、そのPCでも `.local/data/` のlink先を設定します。
+データ本体はGitHubではなく、Dropbox、project固有のローカルディスク、HPCなどにあります。別PCで同じデータが必要なら、そのPCでも `.local/data/` のlink先を設定します。
 
 ---
 
@@ -1144,7 +1132,7 @@ branchが未mergeなら、Gitが安全のため削除を拒否することがあ
 - Codex／Claude Codeのログイン
 - Miniforge環境
 - `~/.research_env`
-- DropboxとLocalLargeへのsymlink
+- Dropbox共通ルートへのsymlink
 - 各projectの `.local/`
 
 認証情報、conda環境本体、`.local/`をDropboxやGitHubで同期しません。
@@ -1204,10 +1192,7 @@ gh repo clone <GitHubAccount>/research-dev-infra
 
 ```bash
 cd ~/src/research-dev-infra
-
-bash scripts/setup-machine.sh \
-  --local-root /mnt/d/ResearchLocal
-
+bash scripts/setup-machine.sh
 source ~/.bashrc
 
 # Windows側にVisual Studio Codeを導入後
@@ -1222,7 +1207,7 @@ source ~/.bashrc
 research-doctor
 ```
 
-Dropboxの位置やLocalLargeのドライブが1台目と異なっても構いません。`setup-machine.sh`の引数でそのPCの実パスを指定します。
+Dropboxの位置が1台目と異なる場合は、`--dropbox-home`でそのPCの実パスを指定します。project固有のローカルディスクはmachine setupでは登録しません。
 
 ---
 
@@ -1294,13 +1279,9 @@ Dropbox上の入力ファイルは、原則として読み取り専用として�
 
 ---
 
-## 31. LocalLargeに置くもの
+## 31. project固有のローカルディスクに置くもの
 
-```text
-D:\ResearchLocal
-```
-
-または各PCで指定した大容量領域です。
+PC全体で固定の保存先や名前は決めません。研究ごとに必要なら、内蔵SSD、外付けSSD、別ドライブなどの任意の場所を使います。
 
 主な用途：
 
@@ -1312,11 +1293,19 @@ D:\ResearchLocal
 - model checkpoint
 - PC固有の作業結果
 
-projectからは次の形式でlinkします。
+projectからは実パスを直接linkします。
 
 ```bash
-link_data "$LOCAL_ROOT/<Project>/raw" raw
+link_data "/mnt/e/<Project>/raw" raw
 ```
+
+working outputをそこへ置く場合：
+
+```bash
+use_output_dir "/mnt/e/<Project>/results/$WORKSPACE_NAME"
+```
+
+ローカル大容量領域を使わないprojectでは何も設定しません。
 
 ---
 
@@ -1352,12 +1341,19 @@ git pull --rebase
 setup scriptやcommand symlinkが増えた場合は、再度実行します。
 
 ```bash
-bash scripts/setup-machine.sh \
-  --local-root /mnt/d/ResearchLocal
-
+bash scripts/setup-machine.sh
 source ~/.bashrc
 research-doctor
 ```
+
+旧版で `LOCAL_ROOT` / `LocalLarge` を設定していた場合も、この再実行で `~/.research_env` は新形式へ更新されます。旧版から作成済みのprojectで `scripts/setup-local-links.sh` に `$LOCAL_ROOT` が残っている場合は、任意の実パスへ置き換えます。
+
+```bash
+link_data "/mnt/e/<Project>/raw" raw
+use_output_dir "/mnt/e/<Project>/results/$WORKSPACE_NAME"
+```
+
+ローカル大容量領域が不要なprojectでは、その行を削除するだけです。
 
 ---
 
@@ -1402,7 +1398,7 @@ cat ~/.research_env
 
 ```bash
 cd ~/src/research-dev-infra
-bash scripts/setup-machine.sh --local-root /mnt/d/ResearchLocal
+bash scripts/setup-machine.sh
 source ~/.bashrc
 ```
 
@@ -1421,8 +1417,7 @@ Dropboxの実際の場所が異なる場合：
 
 ```bash
 bash scripts/setup-machine.sh \
-  --dropbox-home "/mnt/c/実際の/Dropbox" \
-  --local-root /mnt/d/ResearchLocal
+  --dropbox-home "/mnt/c/実際の/Dropbox"
 ```
 
 ---
@@ -1518,7 +1513,7 @@ push前なら、Gitのindexから外します。
 git rm --cached <large-file>
 ```
 
-`.gitignore`へ追加してcommitし直します。既にpushした大容量fileの履歴削除は別途対応が必要です。研究データは原則として `.local/`、Dropbox、LocalLarge、HPCへ置きます。
+`.gitignore`へ追加してcommitし直します。既にpushした大容量fileの履歴削除は別途対応が必要です。研究データは原則として `.local/`、Dropbox、project固有のローカルディスク、HPCへ置きます。
 
 ---
 
@@ -1529,8 +1524,7 @@ git rm --cached <large-file>
 ```bash
 cd ~/src/research-dev-infra
 
-bash scripts/setup-machine.sh \
-  --local-root /mnt/d/ResearchLocal
+bash scripts/setup-machine.sh
 
 source ~/.bashrc
 hash -r
