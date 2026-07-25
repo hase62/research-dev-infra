@@ -332,17 +332,31 @@ research-doctor
 
 このworkflowでは、**Windows版Visual Studio Codeを画面として使い、処理はWSL2内で実行**します。VS Code本体をUbuntuへaptで入れません。
 
-Windows PowerShellで次を実行します。
+Windows PowerShellで次を実行します。新規導入の場合：
 
 ```powershell
 winget install --id Microsoft.VisualStudioCode -e
 ```
 
-インストール後、Ubuntu terminalを一度閉じて開き直し、確認します。
+既に導入済みの場合は、拡張機能との互換性問題を避けるため更新します。
+
+```powershell
+winget upgrade --id Microsoft.VisualStudioCode -e
+```
+
+VS Codeを更新した後は、開いているVS Code windowをすべて閉じ、Windows PowerShellでWSLを停止します。
+
+```powershell
+wsl --shutdown
+```
+
+Ubuntuを開き直し、確認します。
 
 ```bash
 code --version
 ```
+
+このinfraの `setup-vscode` は、現在のClaude Code extensionが要求する **VS Code 1.98.0以上**を共通の最低条件として検査します。1.98.0未満なら、extensionの導入を始めずに更新手順を表示して停止します。
 
 続いて、公式のWSL、Codex、Claude Codeと、解析用のPython、Jupyter、R extensionを導入します。
 
@@ -1580,7 +1594,52 @@ code .
 
 VS Code左下にWSL接続が表示され、terminalのpromptが `/home/<user>/src/<Project>` を指していることを確認します。
 
-## 45. CodexまたはClaude Codeの利用上限に達した
+## 45. extensionが「VS Codeのversionと互換性がない」と表示される
+
+例：
+
+```text
+Can't install ... because it is not compatible with the current version of Visual Studio Code
+```
+
+WSL側の `code --version` が古い場合に発生します。Windows版VS Codeと、WSL内で動くVS Code Serverは対応するversionで動作するため、Ubuntu側だけを更新しても解決しません。
+
+まず確認します。
+
+```bash
+code --version
+```
+
+1.98.0未満なら、VS Codeをすべて閉じ、Windows PowerShellで更新します。
+
+```powershell
+winget upgrade --id Microsoft.VisualStudioCode -e
+wsl --shutdown
+```
+
+更新候補が見つからない場合：
+
+```powershell
+winget install --id Microsoft.VisualStudioCode -e
+wsl --shutdown
+```
+
+Ubuntuを開き直して確認し、再実行します。
+
+```bash
+code --version
+setup-vscode
+```
+
+新しいWindows版VS Codeへ更新しても古いWSL Serverが残る場合は、VS Codeをすべて閉じた状態で、古いversionのdirectoryだけを削除して `code .` を再実行します。通常は `wsl --shutdown` と再接続だけで自動更新されるため、手動削除は最後の手段です。
+
+```bash
+ls ~/.vscode-server/bin
+```
+
+今回の `setup-vscode` は、最低version未満ならextension導入前に停止し、extensionごとの失敗も集計して非zeroで終了します。失敗があったのに `VS Code setup completed successfully` と表示することはありません。
+
+## 46. CodexまたはClaude Codeの利用上限に達した
 
 障害ではありません。現在のagentを停止し、同じworktreeのまま次を実行します。
 
