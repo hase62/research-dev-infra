@@ -114,5 +114,8 @@ echo "  LocalLarge:                $LOCAL_ROOT_VALUE"
 echo "  Environment file:          $HOME/.research_env"
 echo
 echo "Run: source ~/.bashrc"
-echo "Then: research-doctor"
+echo "Then: hash -r && research-doctor"
 echo "After installing Windows Visual Studio Code: setup-vscode"
+echo
+echo "After pulling a newer infra version, rerun this script once to register any newly added commands."
+echo "Direct fallback: bash $INFRA_ROOT/scripts/setup-vscode.sh"

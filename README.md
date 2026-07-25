@@ -1,6 +1,6 @@
 # research-dev-infra
 
-WSL2、GitHub、Codex、Claude Code、Miniforge、既存Dropboxデータを併用し、複数の研究プロジェクトをできるだけ簡単に開始・継続するための共通基盤です。
+WSL2、GitHub、Visual Studio Code、Codex、Claude Code、Miniforge、既存Dropboxデータを併用し、複数の研究プロジェクトをできるだけ簡単に開始・継続するための共通基盤です。
 
 このREADMEを、**WSL2をインストールした直後から最初の解析を始めるまでの標準手順書**として使用します。
 
@@ -13,11 +13,16 @@ WSL2、GitHub、Codex、Claude Code、Miniforge、既存Dropboxデータを併�
 - Dropboxの既存構造は変更しない。
 - 必要なDropboxまたはローカルデータだけを、各projectの `.local/data/` にsymlinkする。
 - 大規模データ本体や解析中の出力はGitHubへ入れない。
-- CodexとClaude Codeは、対象project repositoryまたは専用worktreeの中から起動する。
+- Visual Studio Codeを共通の編集、Git差分確認、統合terminal、notebook実行の画面として使う。
+- CodexとClaude Codeは両方を導入し、対象project repositoryまたは専用worktreeの中から起動する。
+- どちらかの定額プランの利用上限に達したら、同じtask worktreeで停止し、もう一方へ順次切り替える。
+- 同じworking treeをCodexとClaude Codeに同時編集させない。
 - PC固有の設定は `~/.research_env` と `.local/` に閉じ込める。
 - 新規project開始時にYAMLや複雑なデータカタログは要求しない。
 
-コードをLinuxコマンドで扱うため、Git working treeは `/mnt/c/...` やDropbox直下ではなく、WSL2の `~/src/` に置きます。Dropboxは既存データを参照するためのWindows側ストレージとして利用します。
+コードをLinuxコマンドで扱うため、Git working treeは `/mnt/c/...` やDropbox直下ではなく、WSL2の `~/src/` に置きます。Dropboxは既存データを参照するためのWindows側ストレージとして利用します。Windows版Visual Studio CodeからWSL extensionを介して、このLinux側repositoryを開きます。
+
+この手順でいう「Visual Studio」は **Visual Studio Code** を指します。Windows向けのフルIDEであるVisual Studioは、この構成の前提にはしていません。
 
 ---
 
@@ -58,10 +63,14 @@ WSL2、GitHub、Codex、Claude Code、Miniforge、既存Dropboxデータを併�
 ├── AGENTS.md
 ├── CLAUDE.md
 ├── README.md
+├── .vscode/
+│   └── extensions.json     # 推奨extension
 ├── analysis/
 ├── docs/
 ├── tasks/
 ├── tests/
+├── handoffs/
+│   └── CURRENT.md          # Codex/Claude間の短い引継ぎ
 ├── scripts/
 │   └── setup-local-links.sh
 └── .local/                 # Git管理しない
@@ -340,7 +349,83 @@ research-doctor
 
 ---
 
-## 8. Miniforgeを導入する
+## 8. Visual Studio CodeをWindowsへ導入する
+
+このworkflowでは、**Windows版Visual Studio Codeを画面として使い、処理はWSL2内で実行**します。VS Code本体をUbuntuへaptで入れません。
+
+Windows PowerShellで次を実行します。
+
+```powershell
+winget install --id Microsoft.VisualStudioCode -e
+```
+
+インストール後、Ubuntu terminalを一度閉じて開き直し、確認します。
+
+```bash
+code --version
+```
+
+続いて、公式のWSL、Codex、Claude Codeと、解析用のPython、Jupyter、R extensionを導入します。
+
+`setup-vscode`は`setup-machine.sh`が`~/.local/bin/`へ登録するcommandです。infraを更新して`setup-vscode.sh`が新しく追加された場合は、先に`setup-machine.sh`をもう一度実行してcommandを再登録します。再実行してもDropboxや既存projectの内容は変更されません。
+
+```bash
+cd ~/src/research-dev-infra
+
+bash scripts/setup-machine.sh \
+  --local-root /mnt/d/ResearchLocal
+
+source ~/.bashrc
+hash -r
+command -v setup-vscode
+setup-vscode
+```
+
+Dドライブを使わないPCでは、初回に指定したものと同じ`--local-root`を指定します。command登録前でも、scriptを直接実行できます。
+
+```bash
+cd ~/src/research-dev-infra
+bash scripts/setup-vscode.sh
+```
+
+確認文字列を求められたら、内容を確認して次を入力します。
+
+```text
+VSCODE
+```
+
+導入対象は次です。
+
+- Microsoft WSL
+- OpenAI Codex
+- Anthropic Claude Code
+- Microsoft Python
+- Microsoft Jupyter
+- R extension
+
+infra repositoryをVS Codeで開きます。
+
+```bash
+cd ~/src/research-dev-infra
+code .
+```
+
+VS Codeの左下に `WSL: Ubuntu` などの表示が出ていれば、Windows上のVS CodeがWSL2内のrepositoryとLinux toolchainを使用しています。以後、projectもWSL terminalで対象directoryへ移動してから `code .` で開きます。
+
+### `code: command not found`
+
+まずWindows側にVisual Studio Codeが入っていることを確認します。その後、Windows版VS CodeのExtensions画面でMicrosoftの `WSL` extensionを入れ、Command Paletteから `WSL: Connect to WSL` を一度実行してください。Ubuntuを開き直してから再確認します。
+
+```bash
+code --version
+setup-vscode
+```
+
+CodexとClaude CodeのVS Code extensionおよびCLIは、それぞれ別のサービス、認証、利用上限を持ちます。このinfraは残量を自動判定しません。一方が利用上限を通知したら、同じworktreeでそのsessionを停止し、もう一方へ手動で切り替えます。
+
+---
+
+## 9. Miniforgeを導入する
 
 ```bash
 install-miniforge
@@ -365,7 +450,7 @@ auto_activate_base: false
 
 ---
 
-## 9. CodexとClaude Codeを導入する
+## 10. CodexとClaude Codeを導入する
 
 ```bash
 install-coding-agents
@@ -388,6 +473,10 @@ INSTALL
 codex --version
 claude --version
 ```
+
+CodexとClaude Codeは両方を常時導入しておきます。通常はその時点で使いやすい方から開始し、定額プランの利用上限に達したら同じtask worktreeで別のagentへ切り替えます。両者を同じworking treeで同時実行してはいけません。
+
+CLIはVS Codeの統合terminalから起動できます。VS Code extensionを使う場合も、同じrepositoryまたはworktreeを開き、同時編集を避けるという原則は同じです。
 
 現在の `scripts/install-agents.sh` は、Codex installerを非対話モードで実行するため、installer内からCodexを自動起動しません。インストール後のCodexとClaude Codeは、実際の研究repositoryに移動してから手動で起動します。
 
@@ -423,7 +512,7 @@ infraを最新版へ更新した後、`install-coding-agents`を再実行して�
 
 ---
 
-## 10. マシン全体を診断する
+## 11. マシン全体を診断する
 
 ```bash
 research-doctor
@@ -447,7 +536,7 @@ research-doctor
 
 # Part II. 最初の研究projectを作る
 
-## 11. private GitHub repository付きでprojectを作る
+## 12. private GitHub repository付きでprojectを作る
 
 例として `ProteomicAging` を作ります。
 
@@ -473,6 +562,14 @@ git remote -v
 git branch -vv
 ```
 
+VS Codeで開きます。
+
+```bash
+code .
+```
+
+左下がWSL接続になっていることを確認し、以後の編集、terminal、Git差分確認をこのwindowで行います。
+
 GitHub repositoryをまだ作らない場合：
 
 ```bash
@@ -493,7 +590,7 @@ gh repo create ProteomicAging \
 
 ---
 
-## 12. PROJECT.mdへ研究内容を書く
+## 13. PROJECT.mdへ研究内容を書く
 
 ```bash
 nano PROJECT.md
@@ -523,7 +620,7 @@ CodexとClaude Codeは、起動したrepositoryまたはworktreeの下を対象�
 
 ---
 
-## 13. 必要なデータだけ `.local/data/` にリンクする
+## 14. 必要なデータだけ `.local/data/` にリンクする
 
 ```bash
 nano scripts/setup-local-links.sh
@@ -560,7 +657,7 @@ CodexとClaude Codeに見せる入力は `.local/data/` 以下にリンクした
 
 # Part III. 解析環境を作る
 
-## 14. 原則：1 project 1環境から始める
+## 15. 原則：1 project 1環境から始める
 
 環境を細かく分けすぎる必要はありません。まずproject用環境を1つ作り、依存関係が衝突した時だけ分割します。
 
@@ -632,7 +729,7 @@ mamba install -n proteomic-aging \
 
 ---
 
-## 15. 環境定義をGitHubで管理する
+## 16. 環境定義をGitHubで管理する
 
 環境を有効化した状態で、明示的に指定した主要packageを保存します。
 
@@ -670,7 +767,7 @@ mamba env update -f environment.yml --prune
 
 ---
 
-## 16. 最初の動作確認を行う
+## 17. 最初の動作確認を行う
 
 project rootで実行します。
 
@@ -706,25 +803,36 @@ Failures: 0; warnings: 1
 
 ---
 
-# Part IV. CodexまたはClaude Codeで最初の解析を始める
+# Part IV. VS CodeからCodexまたはClaude Codeで最初の解析を始める
 
-## 17. 必ず対象projectへ移動してから起動する
+## 18. 必ず対象projectをVS Codeで開いてから起動する
 
-Codex：
+WSL terminalで対象projectへ移動し、VS Codeを開きます。
 
 ```bash
 cd ~/src/ProteomicAging
+code .
+```
+
+VS Codeの統合terminalを開き、解析環境を有効化します。
+
+```bash
 conda activate proteomic-aging
+```
+
+Codexから開始する場合：
+
+```bash
 codex
 ```
 
-Claude Code：
+Claude Codeから開始する場合：
 
 ```bash
-cd ~/src/ProteomicAging
-conda activate proteomic-aging
 claude
 ```
+
+VS CodeのCodexまたはClaude Code panelを使っても構いません。最も単純で共通性が高い運用は、VS CodeをeditorとGit画面として使い、統合terminalからCLIを起動する方法です。
 
 次の場所から起動してはいけません。
 
@@ -751,6 +859,65 @@ PROJECT.md、AGENTS.mdまたはCLAUDE.mdを読んでください。
 commitやpushは行わないでください。
 ```
 
+### 一方の利用上限に達したら、同じworktreeで切り替える
+
+CodexとClaude Codeは会話履歴を共有しませんが、**同じdirectory内のfile、Git差分、未commit変更はそのまま共有できます**。上限到達時にrepositoryをcloneし直したり、新しいworktreeへ移動したりする必要はありません。
+
+1. 現在のagent sessionを停止する。両者を同時に動かさない。
+2. VS Codeで変更fileを保存する。
+3. 統合terminalで状態を確認する。
+
+```bash
+git status --short
+git diff --stat
+```
+
+4. 可能なら `handoffs/CURRENT.md` を短く更新する。
+
+```markdown
+## Current state
+入力inventory scriptは作成済み。出力先のpath処理を修正中。
+
+## Completed
+- analysis/inventory.pyを追加
+- CSVとRDSの判定を実装
+
+## Next actions
+- symlink先のdirectory処理を確認
+- tests/test_inventory.pyを追加
+
+## Validation performed
+- 小規模sampleでPython実行済み
+```
+
+5. 状態が一貫しているなら、task branch上でcheckpoint commitを作ってもよい。
+
+```bash
+git add <必要なfile>
+git commit -m "WIP: checkpoint before agent switch"
+```
+
+途中状態をcommitしたくなければ、未commit差分のままでも同じworktree内で引き継げます。その場合は `handoffs/CURRENT.md` と `git diff` を必ず確認させます。
+
+6. 同じVS Code window、同じ統合terminalのdirectoryで、もう一方を起動する。
+
+```bash
+claude
+# または
+codex
+```
+
+切替後の最初の依頼例：
+
+```text
+PROJECT.md、handoffs/CURRENT.md、git status、git diffを確認してください。
+前のagentが途中まで進めた同じtaskを引き継いでください。
+既存変更を不用意に巻き戻さず、まず現状と次の作業を要約してください。
+commitやpushは行わないでください。
+```
+
+利用上限で前のagentが突然止まり、handoffを書けなかった場合も、新しいagentに `git status`、`git diff`、変更file、test結果を調べさせれば続行できます。
+
 ### Codex／Claude画面から終了する
 
 通常は各CLIの終了コマンドを使うか、`Ctrl+C`で戻ります。終了後に次のようなpromptが出れば通常のbashです。
@@ -761,7 +928,7 @@ commitやpushは行わないでください。
 
 ---
 
-## 18. Agent作業後に人間が確認する
+## 19. Agent作業後に人間が確認する
 
 Agentに自動commit・pushをさせず、まず差分を確認します。
 
@@ -790,27 +957,30 @@ git push
 
 # Part V. 日常運用
 
-## 19. 作業を始める時
+## 20. 作業を始める時
 
 ```bash
 cd ~/src/<Project>
 git status
 git fetch --all --prune
 git pull --rebase
-conda activate <environment-name>
+code .
 ```
 
-CodexまたはClaude Codeを起動します。
+VS Codeの統合terminalで解析環境を有効化し、CodexまたはClaude Codeを起動します。
 
 ```bash
+conda activate <environment-name>
 codex
 # または
 claude
 ```
 
+一方の利用上限に達したら、そのsessionを停止し、同じdirectoryで `handoffs/CURRENT.md` とGit差分を確認してからもう一方を起動します。
+
 ---
 
-## 20. PCを移る前
+## 21. PCを移る前
 
 ```bash
 git status
@@ -831,9 +1001,9 @@ git push
 
 ---
 
-# Part VI. CodexとClaude Codeをworktreeで分離する
+# Part VI. 切替可能なtask worktreeと独立review worktree
 
-## 21. 実装用worktreeを作る
+## 22. 上限到達時にagentを切り替えられるshared worktreeを作る
 
 main working treeに未commit変更がないことを確認します。
 
@@ -842,30 +1012,39 @@ cd ~/src/ProteomicAging
 git status
 ```
 
-Codex用worktree：
+通常の実装taskは、agent名ではなく `shared` modeで作ることを推奨します。
 
 ```bash
-new-worktree ProteomicAging codex task-001-import
+new-worktree ProteomicAging shared task-001-import
 
-cd ~/worktrees/ProteomicAging/codex-task-001-import
-conda activate proteomic-aging
-codex
+cd ~/worktrees/ProteomicAging/shared-task-001-import
+code .
 ```
 
 作成されるbranch：
 
 ```text
-agent/codex/task-001-import
+work/task-001-import
 ```
 
-Claude Code用worktree：
+VS Codeの統合terminalで開始します。
 
 ```bash
-new-worktree ProteomicAging claude task-002-review
-
-cd ~/worktrees/ProteomicAging/claude-task-002-review
 conda activate proteomic-aging
+codex
+```
+
+Codexの利用上限に達したら、同じworktreeで停止し、handoffとGit差分を確認してから切り替えます。
+
+```bash
 claude
+```
+
+agent別worktreeは、独立実装やreviewを同時並行させたい場合に使います。
+
+```bash
+new-worktree ProteomicAging codex experiment-001
+new-worktree ProteomicAging claude review-001
 ```
 
 各worktreeには独立した次の領域が作られます。
@@ -877,23 +1056,27 @@ claude
 
 入力data linkはprojectの `scripts/setup-local-links.sh` から再生成されます。
 
-同じworking treeでCodexとClaude Codeを同時に編集させません。
+同じworking treeでCodexとClaude Codeを同時に編集させません。shared worktreeでは順次切替、agent別worktreeでは独立作業とreviewに使います。
 
 標準運用：
 
 ```text
-一方が実装
+shared worktreeで一方が実装
   ↓
-commitまたは固定したdiff
+利用上限または役割交代
   ↓
-他方が独立レビュー
+handoffs/CURRENT.md + Git差分
+  ↓
+同じworktreeでもう一方が続行
+  ↓
+必要に応じて別worktreeで独立レビュー
   ↓
 人間が採否判断
 ```
 
 ---
 
-## 22. 特定branchを基点にreview worktreeを作る
+## 23. 特定branchを基点にreview worktreeを作る
 
 CodexのbranchをClaude Codeでreviewする例：
 
@@ -912,7 +1095,7 @@ claude
 
 ---
 
-## 23. worktreeを削除する
+## 24. worktreeを削除する
 
 まずworktree内に未commit変更がないことを確認します。
 
@@ -920,10 +1103,16 @@ claude
 git status
 ```
 
-worktreeだけ削除し、branchを残す場合：
+shared worktreeだけ削除し、branchを残す場合：
 
 ```bash
-remove-worktree ProteomicAging codex task-001-import
+remove-worktree ProteomicAging shared task-001-import
+```
+
+agent別worktreeの場合：
+
+```bash
+remove-worktree ProteomicAging codex experiment-001
 ```
 
 branchも削除する場合：
@@ -942,7 +1131,7 @@ branchが未mergeなら、Gitが安全のため削除を拒否することがあ
 
 # Part VII. 2台目以降のPC
 
-## 24. 方針
+## 25. 方針
 
 2台目以降では、次をGitHubから取得します。
 
@@ -962,7 +1151,7 @@ branchが未mergeなら、Gitが安全のため削除を拒否することがあ
 
 ---
 
-## 25. 2台目でinfraを取得する
+## 26. 2台目でinfraを取得する
 
 ### 方法A：最初にGitHub CLIを準備できる場合
 
@@ -1011,7 +1200,7 @@ gh repo clone <GitHubAccount>/research-dev-infra
 
 ---
 
-## 26. 2台目のマシン設定
+## 27. 2台目のマシン設定
 
 ```bash
 cd ~/src/research-dev-infra
@@ -1020,6 +1209,9 @@ bash scripts/setup-machine.sh \
   --local-root /mnt/d/ResearchLocal
 
 source ~/.bashrc
+
+# Windows側にVisual Studio Codeを導入後
+setup-vscode
 
 install-miniforge
 source ~/.bashrc
@@ -1034,7 +1226,7 @@ Dropboxの位置やLocalLargeのドライブが1台目と異なっても構い�
 
 ---
 
-## 27. 2台目で研究projectを取得する
+## 28. 2台目で研究projectを取得する
 
 ```bash
 cd ~/src
@@ -1058,15 +1250,16 @@ research-doctor ProteomicAging
 mamba env create -f environment.yml
 conda activate proteomic-aging
 analysis-smoke-test ProteomicAging
+code .
 ```
 
-これで1台目と同じコードを使って解析できます。
+VS CodeのCodex、Claude Code extensionはPCごとにサインインします。これで1台目と同じコードを使って解析でき、どちらかの利用上限に達した場合も同じworktreeで別のagentへ切り替えられます。
 
 ---
 
 # Part VIII. データの置き場所
 
-## 28. GitHubに置くもの
+## 29. GitHubに置くもの
 
 - ソースコード
 - shell / R / Python script
@@ -1081,7 +1274,7 @@ analysis-smoke-test ProteomicAging
 
 ---
 
-## 29. Dropbox `Research` / `ForShareLargeData`から参照するもの
+## 30. Dropbox `Research` / `ForShareLargeData`から参照するもの
 
 既存構造は変更しません。必要な場所を `.local/data/` にlinkします。
 
@@ -1101,7 +1294,7 @@ Dropbox上の入力ファイルは、原則として読み取り専用として�
 
 ---
 
-## 30. LocalLargeに置くもの
+## 31. LocalLargeに置くもの
 
 ```text
 D:\ResearchLocal
@@ -1127,7 +1320,7 @@ link_data "$LOCAL_ROOT/<Project>/raw" raw
 
 ---
 
-## 31. WSL2 scratchに置くもの
+## 32. WSL2 scratchに置くもの
 
 ```text
 ~/scratch/<Project>/<Workspace>
@@ -1148,7 +1341,7 @@ Git repositoryと高頻度I/Oの作業領域をWSL2のLinux filesystemに置く�
 
 # Part IX. infra repository自体を更新する
 
-## 32. 別PCで変更されたinfraを取り込む
+## 33. 別PCで変更されたinfraを取り込む
 
 ```bash
 cd ~/src/research-dev-infra
@@ -1168,7 +1361,7 @@ research-doctor
 
 ---
 
-## 33. READMEやscriptを変更してGitHubへ反映する
+## 34. READMEやscriptを変更してGitHubへ反映する
 
 ```bash
 cd ~/src/research-dev-infra
@@ -1191,7 +1384,7 @@ git push
 
 # Part X. よくある問題
 
-## 34. `command not found: new-project`など
+## 35. `command not found: new-project`など
 
 ```bash
 source ~/.bashrc
@@ -1215,7 +1408,7 @@ source ~/.bashrc
 
 ---
 
-## 35. Dropbox directory was not found
+## 36. Dropbox directory was not found
 
 Windows側でDropboxが起動しており、次が存在するか確認します。
 
@@ -1234,7 +1427,7 @@ bash scripts/setup-machine.sh \
 
 ---
 
-## 36. Dropboxファイルが見えるが読めない
+## 37. Dropboxファイルが見えるが読めない
 
 Dropboxの「オンラインのみ」状態で、実体がまだPCにダウンロードされていない可能性があります。Windows側のDropboxで対象folderまたはfileをローカル保存状態にしてから再確認します。
 
@@ -1244,7 +1437,7 @@ ls -lh .local/data/<link-name>
 
 ---
 
-## 37. `claude: command not found`
+## 38. `claude: command not found`
 
 ```bash
 curl -fsSL https://claude.ai/install.sh | bash -s stable
@@ -1257,7 +1450,7 @@ claude --version
 
 ---
 
-## 38. `codex`を実行すると通常promptへ戻る
+## 39. `codex`を実行すると通常promptへ戻る
 
 通常promptの例：
 
@@ -1283,7 +1476,7 @@ versionが表示されればインストール自体は完了しています。
 
 ---
 
-## 39. `new-worktree`がmainの未commit変更を理由に止まる
+## 40. `new-worktree`がmainの未commit変更を理由に止まる
 
 安全のための仕様です。
 
@@ -1307,7 +1500,7 @@ git stash pop
 
 ---
 
-## 40. `analysis-smoke-test`でRだけwarningになる
+## 41. `analysis-smoke-test`でRだけwarningになる
 
 active environmentにRを入れていないだけなら問題ありません。Rを使うprojectであれば追加します。
 
@@ -1317,7 +1510,7 @@ mamba install -n <environment-name> -c conda-forge r-base
 
 ---
 
-## 41. GitHubへ大きなfileをcommitしてしまった
+## 42. GitHubへ大きなfileをcommitしてしまった
 
 push前なら、Gitのindexから外します。
 
@@ -1329,16 +1522,102 @@ git rm --cached <large-file>
 
 ---
 
+## 43. `setup-vscode: command not found`
+
+`setup-vscode.sh`を追加した後にinfra repositoryだけを更新し、`setup-machine.sh`を再実行していない場合に発生します。`setup-machine.sh`は共通commandを`~/.local/bin/`へsymlinkとして登録します。
+
+```bash
+cd ~/src/research-dev-infra
+
+bash scripts/setup-machine.sh \
+  --local-root /mnt/d/ResearchLocal
+
+source ~/.bashrc
+hash -r
+command -v setup-vscode
+```
+
+正常なら、次のようなpathが表示されます。
+
+```text
+/home/<user>/.local/bin/setup-vscode
+```
+
+その後に実行します。
+
+```bash
+setup-vscode
+```
+
+急いでいる場合はcommand登録を待たず、repository内のscriptを直接実行できます。
+
+```bash
+cd ~/src/research-dev-infra
+bash scripts/setup-vscode.sh
+```
+
+まだ見つからない場合は次を確認します。
+
+```bash
+ls -l ~/.local/bin/setup-vscode
+echo "$PATH" | tr ':' '\n' | grep -F "$HOME/.local/bin"
+```
+
+---
+
+## 44. `code: command not found`またはVS CodeがWindows側directoryを開く
+
+Visual Studio CodeはWindowsへインストールし、Microsoft WSL extensionを使います。Ubuntu内へLinux版VS Codeをaptで入れません。
+
+Windows PowerShell：
+
+```powershell
+winget install --id Microsoft.VisualStudioCode -e
+```
+
+Windows版VS CodeでMicrosoftの `WSL` extensionを入れ、Ubuntuを開き直します。
+
+```bash
+code --version
+setup-vscode
+cd ~/src/<Project>
+code .
+```
+
+VS Code左下にWSL接続が表示され、terminalのpromptが `/home/<user>/src/<Project>` を指していることを確認します。
+
+## 45. CodexまたはClaude Codeの利用上限に達した
+
+障害ではありません。現在のagentを停止し、同じworktreeのまま次を実行します。
+
+```bash
+git status --short
+git diff --stat
+```
+
+`handoffs/CURRENT.md`を更新し、もう一方を起動します。
+
+```bash
+claude
+# または
+codex
+```
+
+新しいagentには、最初に `PROJECT.md`、`handoffs/CURRENT.md`、`git status`、`git diff`を読ませます。別worktreeを新規作成する必要はありません。
+
+---
+
 # Part XI. 提供コマンド一覧
 
 | コマンド | 用途 |
 |---|---|
 | `new-project` | 新規project repositoryを作成 |
-| `new-worktree` | Agent用branchとworktreeを作成 |
+| `new-worktree` | sharedまたはagent別のbranchとworktreeを作成 |
 | `remove-worktree` | worktreeを安全に削除 |
 | `setup-project-links` | `.local`のdata / scratch / output linkを生成 |
 | `research-doctor` | WSL2、GitHub、Dropbox、Agent環境を点検 |
 | `install-coding-agents` | CodexとClaude Codeを公式installerで導入 |
+| `setup-vscode` | VS Codeの公式WSL、Codex、Claude Code、解析extensionを導入 |
 | `install-miniforge` | WSL2内へMiniforgeを導入 |
 | `analysis-smoke-test` | projectのGit、data link、scratch、Python/Rを確認 |
 
@@ -1350,6 +1629,7 @@ new-worktree --help
 remove-worktree --help
 install-miniforge --help
 install-coding-agents --help
+setup-vscode --help
 ```
 
 ---
@@ -1369,6 +1649,8 @@ install-coding-agents --help
 - 入力データを直接変更させない。
 - commit、push、merge、rebaseは原則として人間が確認後に行う。
 - Agent作業後は必ず `git status` と `git diff` を確認する。
+- 利用上限でagentを切り替える場合は同じworktreeを使い、`handoffs/CURRENT.md`を引継ぎに使う。
+- 同じworktreeでCodexとClaude Codeを同時稼働させない。
 
 ---
 
@@ -1392,5 +1674,8 @@ READMEを標準手順書とし、詳細な背景や補足は `docs/` を参照�
 - [GitHub CLI: gh repo create](https://cli.github.com/manual/gh_repo_create)
 - [GitHub CLI environment variables](https://cli.github.com/manual/gh_help_environment)
 - [Miniforge](https://github.com/conda-forge/miniforge)
+- [Microsoft: Developing in WSL with Visual Studio Code](https://code.visualstudio.com/docs/remote/wsl)
 - [OpenAI Codex documentation](https://developers.openai.com/codex/)
+- [OpenAI Codex VS Code extension](https://marketplace.visualstudio.com/items?itemName=OpenAI.chatgpt)
 - [Claude Code documentation](https://code.claude.com/docs/en/setup)
+- [Claude Code in VS Code](https://code.claude.com/docs/en/vs-code)
