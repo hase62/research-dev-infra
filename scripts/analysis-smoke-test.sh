@@ -37,16 +37,16 @@ printf 'Project: %s\nPath:    %s\n\n' "$PROJECT" "$REPO"
 [[ -d "$REPO" ]] && ok "project directory exists" || fail_check "project directory not found"
 [[ -d "$REPO/.git" || -f "$REPO/.git" ]] && ok "Git working tree" || fail_check "not a Git working tree"
 
-for local_path in "$REPO/.local/data" "$REPO/.local/scratch" "$REPO/.local/output"; do
-  if [[ -e "$local_path" ]]; then
-    ok "local path: ${local_path#$REPO/}"
+for workspace_path in "$REPO/workspace/data" "$REPO/workspace/scratch" "$REPO/workspace/output"; do
+  if [[ -e "$workspace_path" ]]; then
+    ok "workspace path: ${workspace_path#$REPO/}"
   else
-    fail_check "missing local path: ${local_path#$REPO/}"
+    fail_check "missing workspace path: ${workspace_path#$REPO/}"
   fi
 done
 
-if [[ -d "$REPO/.local/scratch" && -w "$REPO/.local/scratch" ]]; then
-  TEST_FILE="$REPO/.local/scratch/.write_test_$$"
+if [[ -d "$REPO/workspace/scratch" && -w "$REPO/workspace/scratch" ]]; then
+  TEST_FILE="$REPO/workspace/scratch/.write_test_$$"
   if printf 'research-dev-infra smoke test\n' > "$TEST_FILE" && rm -f "$TEST_FILE"; then
     ok "scratch is writable"
   else
@@ -54,7 +54,7 @@ if [[ -d "$REPO/.local/scratch" && -w "$REPO/.local/scratch" ]]; then
   fi
 fi
 
-if [[ -d "$REPO/.local/output" && -w "$REPO/.local/output" ]]; then
+if [[ -d "$REPO/workspace/output" && -w "$REPO/workspace/output" ]]; then
   ok "output is writable"
 else
   fail_check "output is not writable"

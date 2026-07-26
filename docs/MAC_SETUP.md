@@ -134,7 +134,7 @@ cd ~/src
 gh repo clone "$GITHUB_ACCOUNT/Sepsis.Atlas"
 cd Sepsis.Atlas
 
-setup-project-links
+setup-workspace
 mamba env create -f environment.yml
 conda activate sepsis-atlas
 analysis-smoke-test Sepsis.Atlas
@@ -156,7 +156,7 @@ use_output_dir "$LARGE_ROOT/Sepsis/results/$WORKSPACE_NAME"
 # ~/.research_env
 export SEPSIS_LOCAL_CACHE_ROOT="/Volumes/ExternalSSD/SepsisAtlas/cache"
 
-# scripts/setup-local-links.sh
+# scripts/configure-workspace.sh
 if [[ -n "${SEPSIS_LOCAL_CACHE_ROOT:-}" ]]; then
   link_data "$SEPSIS_LOCAL_CACHE_ROOT" local_cache
 fi

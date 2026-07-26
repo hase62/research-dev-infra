@@ -1,5 +1,5 @@
-# Machine-local link layer, secrets, and disposable outputs
-.local/
+# Reconstructed workspace links, secrets, and disposable outputs
+workspace/
 .env
 .env.*
 !.env.example

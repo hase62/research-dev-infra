@@ -151,7 +151,7 @@ if command -v gh >/dev/null 2>&1; then
   fi
 fi
 
-for variable_name in RESEARCH_ROOT LARGE_ROOT SRC_ROOT WORKTREE_ROOT SCRATCH_ROOT; do
+for variable_name in DROPBOX_ROOT RESEARCH_ROOT LARGE_ROOT SRC_ROOT WORKTREE_ROOT SCRATCH_ROOT; do
   value="${!variable_name:-}"
   if [[ -n "$value" && -e "$value" ]]; then
     ok "$variable_name -> $value"
@@ -161,6 +161,10 @@ for variable_name in RESEARCH_ROOT LARGE_ROOT SRC_ROOT WORKTREE_ROOT SCRATCH_ROO
     fail_check "$variable_name is not set"
   fi
 done
+
+if [[ -e "$HOME/data-roots" || -L "$HOME/data-roots" ]]; then
+  warn "Legacy ~/data-roots remains; rerun setup-machine and inspect any preserved non-symlink contents"
+fi
 
 if [[ -n "$PROJECT" && -n "${SRC_ROOT:-}" ]]; then
   REPO="$SRC_ROOT/$PROJECT"
@@ -173,7 +177,7 @@ if [[ -n "$PROJECT" && -n "${SRC_ROOT:-}" ]]; then
     fail_check "Git repository not found: $REPO"
   fi
 
-  for file_name in PROJECT.md AGENTS.md CLAUDE.md scripts/setup-local-links.sh; do
+  for file_name in PROJECT.md AGENTS.md CLAUDE.md scripts/configure-workspace.sh; do
     if [[ -f "$REPO/$file_name" ]]; then
       ok "$file_name"
     else
@@ -181,17 +185,17 @@ if [[ -n "$PROJECT" && -n "${SRC_ROOT:-}" ]]; then
     fi
   done
 
-  if [[ -d "$REPO/.local" ]]; then
-    ok ".local directory"
+  if [[ -d "$REPO/workspace" ]]; then
+    ok "workspace directory"
     while IFS= read -r link_path; do
       if [[ -e "$link_path" ]]; then
         ok "link: ${link_path#$REPO/} -> $(readlink "$link_path")"
       else
         warn "broken link: ${link_path#$REPO/} -> $(readlink "$link_path")"
       fi
-    done < <(find "$REPO/.local" -maxdepth 2 -type l -print 2>/dev/null)
+    done < <(find "$REPO/workspace" -maxdepth 2 -type l -print 2>/dev/null)
   else
-    warn ".local directory is missing; run setup-project-links in the project"
+    warn "workspace directory is missing; run setup-workspace in the project"
   fi
 fi
 

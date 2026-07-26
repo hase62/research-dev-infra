@@ -2,7 +2,7 @@
 
 WSL2またはmacOS上で、GitHub、Dropbox、VS Code、Emacs、Codex、Claude Code、Miniforgeを組み合わせて研究開発を行うための共通基盤です。
 
-このREADMEは、**新しい端末を研究開発に使える状態へする手順**と、**projectを開始・再開する日常手順**をまとめています。端末台数では手順を分けず、どの端末でも同じmachine setupを行います。既存projectではrepositoryをcloneし、解析環境とlocal linkだけを端末ごとに再構築します。
+このREADMEは、**新しい端末を研究開発に使える状態へする手順**と、**projectを開始・再開する日常手順**をまとめています。端末台数では手順を分けず、どの端末でも同じmachine setupを行います。既存projectではrepositoryをcloneし、解析環境と`workspace/`のlinkだけを端末ごとに再構築します。
 
 詳細な補足は [`docs/`](docs/) に分離しています。
 
@@ -15,12 +15,12 @@ WSL2またはmacOS上で、GitHub、Dropbox、VS Code、Emacs、Codex、Claude C
 - **永続化すべき情報の唯一のコピーを、特定PCだけに置かない。**
 - code、設定、手順、Agent指示、handoff、小さなmetadataはGitHubで共有する。
 - data、論文、大きな中間成果物・最終成果物はDropboxで共有する。
-- Dropboxの既存構造は変更せず、必要なsubpathだけ各projectの `.local/` にsymlinkする。
-- `.local/`は保存先ではなく、共有storageとlocal scratchをproject内から参照するlink層とする。
+- Dropboxの既存構造は変更せず、必要なsubpathだけ各projectの `workspace/` にsymlinkする。
+- `workspace/`は保存先ではなく、共有storageとlocal scratchをproject内から参照するlink層とする。
 - PC固有に残してよいものは、credential、環境本体、cache、temporary file、再生成可能なscratchに限定する。
 - CodexとClaude Codeはproject repositoryまたは専用worktreeの中から起動する。
 - 同じworking treeをCodexとClaude Codeに同時編集させない。
-- 端末固有の設定は `~/.research_env` とprojectの `.local/` に閉じ込める。
+- 端末固有の設定は `~/.research_env` とprojectの `workspace/` に閉じ込める。
 - 解析環境はprojectごとに再構築可能な形で管理する。
 
 WSL2ではrepositoryをLinux filesystemの `~/src/` に置き、Windows版VS CodeからWSL extension経由で開きます。macOSでは `~/src/` に直接cloneし、Mac版VS CodeまたはEmacsで開きます。
@@ -36,13 +36,12 @@ WSL2ではrepositoryをLinux filesystemの `~/src/` に置き、Windows版VS Cod
 │   ├── Sepsis.Atlas/
 │   └── OtherProject/
 ├── worktrees/
-│   └── <Project>/<workspace>/
-├── scratch/
-│   └── <Project>/<workspace>/{scratch,output}
-└── data-roots/
-    ├── Research -> Dropbox/Research
-    └── ForShareLargeData -> Dropbox/ForShareLargeData
+│   └── <Project>/<worktree-name>/
+└── scratch/
+    └── <Project>/<checkout-name>/{scratch,output}
 ```
+
+Dropboxはこのtreeの下へ複製・中継しません。`~/.research_env`の`RESEARCH_ROOT`と`LARGE_ROOT`が、WSL2ではWindows側Dropbox、macOSではFile Provider上のDropbox実体を直接指します。したがって`~/data-roots/`は不要です。
 
 各projectの最小構成：
 
@@ -58,14 +57,14 @@ WSL2ではrepositoryをLinux filesystemの `~/src/` に置き、Windows版VS Cod
 ├── tasks/
 ├── tests/
 ├── handoffs/CURRENT.md
-├── scripts/setup-local-links.sh
-└── .local/                 # Git管理しない
+├── scripts/configure-workspace.sh
+└── workspace/                 # Git管理しない
     ├── data/
     ├── scratch/
     └── output/
 ```
 
-`.local/scratch`は常にlocalの一時領域です。`.local/output`は未設定時には `~/scratch/<Project>/<Workspace>/output` を指しますが、これは**再生成可能なworking output用の暫定先**です。別PCで必要になる成果物、再生成コストが高い成果物、最終成果物は、`scripts/setup-local-links.sh`でDropbox上の共有directoryを`.local/output`へ割り当てます。
+`workspace/scratch`は常にlocalの一時領域です。`workspace/output`は未設定時には `~/scratch/<Project>/<checkout-name>/output` を指しますが、これは**再生成可能なworking output用の暫定先**です。別PCで必要になる成果物、再生成コストが高い成果物、最終成果物は、`scripts/configure-workspace.sh`でDropbox上の共有directoryを`workspace/output`へ割り当てます。
 
 ---
 
@@ -259,10 +258,15 @@ bash scripts/setup-machine.sh \
 ### 共通確認
 
 ```bash
-ls -ld ~/data-roots/Research
-ls -ld ~/data-roots/ForShareLargeData
+source ~/.research_env
+printf 'RESEARCH_ROOT=%s\n' "$RESEARCH_ROOT"
+printf 'LARGE_ROOT=%s\n' "$LARGE_ROOT"
+ls -ld "$RESEARCH_ROOT" "$LARGE_ROOT"
+command -v setup-workspace
 command -v research-doctor
 ```
+
+`RESEARCH_ROOT`と`LARGE_ROOT`はDropbox実体を直接指します。旧版で作成された`~/data-roots/`内の既知symlinkは、`setup-machine.sh`再実行時に安全に削除されます。予期しない実fileがある場合は削除せずwarningを出します。
 
 `setup-machine.sh`は次を作成します。
 
@@ -271,7 +275,7 @@ command -v research-doctor
 ~/.local/bin/new-project
 ~/.local/bin/new-worktree
 ~/.local/bin/remove-worktree
-~/.local/bin/setup-project-links
+~/.local/bin/setup-workspace
 ~/.local/bin/research-doctor
 ~/.local/bin/install-coding-agents
 ~/.local/bin/install-miniforge
@@ -448,13 +452,13 @@ cd ~/src/Sepsis.Atlas
 
 ```text
 PROJECT.md
-scripts/setup-local-links.sh
+scripts/configure-workspace.sh
 ```
 
 その後：
 
 ```bash
-setup-project-links
+setup-workspace
 research-doctor Sepsis.Atlas
 ```
 
@@ -471,7 +475,7 @@ cd ~/src
 gh repo clone hase62/Sepsis.Atlas
 cd Sepsis.Atlas
 
-setup-project-links
+setup-workspace
 research-doctor Sepsis.Atlas
 ```
 
@@ -487,25 +491,24 @@ analysis-smoke-test Sepsis.Atlas
 
 - Codex／Claude Codeのログイン
 - Miniforge環境
-- `~/.research_env`
-- Dropbox rootへのsymlink
-- projectの `.local/`
+- Dropbox実体pathを記録した`~/.research_env`
+- projectの `workspace/`
 
 GitHubまたはDropboxで同期しないもの：
 
 - credential、token、secret
 - conda/mamba環境本体
-- `.local/`のsymlinkそのもの
+- `workspace/`のsymlinkそのもの
 - cache、temporary file、再生成可能なlocal scratch
 - 実行中processとAgent chat session
 
-`.local/`のlink先となるdataや永続outputは、原則としてDropbox上にあります。特定PCにだけ必要な絶対pathを使うのは例外です。
+`workspace/`のlink先となるdataや永続outputは、原則としてDropbox上にあります。特定PCにだけ必要な絶対pathを使うのは例外です。
 
 ---
 
 # 5. データlinkを設定する
 
-projectの `scripts/setup-local-links.sh` に、必要な共有dataとoutputだけ記述します。このscript自体はGitHubへcommitし、どのPCでも同じ論理pathを再構築できるようにします。
+projectの `scripts/configure-workspace.sh` に、必要な共有dataとoutputだけ記述します。このscript自体はGitHubへcommitし、どのPCでも同じ論理pathを再構築できるようにします。
 
 通常の共有設定：
 
@@ -517,7 +520,7 @@ link_data "$LARGE_ROOT/Sepsis/processed" processed
 use_output_dir "$LARGE_ROOT/Sepsis/results/$WORKSPACE_NAME"
 ```
 
-`.local/scratch`はlocal一時領域、`.local/output`は上記の共有成果物directoryへの入口になります。`use_output_dir`を指定しない場合、`.local/output`はlocal scratch配下を指すため、そこにあるものは再生成可能であることを前提とします。
+`workspace/scratch`はlocal一時領域、`workspace/output`は上記の共有成果物directoryへの入口になります。`use_output_dir`を指定しない場合、`workspace/output`はlocal scratch配下を指すため、そこにあるものは再生成可能であることを前提とします。
 
 PC固有local diskは、共有不要かつ再生成可能な巨大cacheなどに限る例外です。どうしても使う場合は、PCごとの環境変数を`~/.research_env`へ追加し、tracked scriptへPC名や個別pathを直接書き込まない形を推奨します。
 
@@ -526,7 +529,7 @@ PC固有local diskは、共有不要かつ再生成可能な巨大cacheなどに
 export SEPSIS_LOCAL_CACHE_ROOT="/mnt/e/SepsisAtlas/cache"  # WSL2
 # export SEPSIS_LOCAL_CACHE_ROOT="/Volumes/ExternalSSD/SepsisAtlas/cache"  # macOS
 
-# scripts/setup-local-links.sh側
+# scripts/configure-workspace.sh側
 if [[ -n "${SEPSIS_LOCAL_CACHE_ROOT:-}" ]]; then
   link_data "$SEPSIS_LOCAL_CACHE_ROOT" local_cache
 fi
@@ -535,13 +538,13 @@ fi
 反映：
 
 ```bash
-setup-project-links
+setup-workspace
 ```
 
 確認：
 
 ```bash
-find .local -maxdepth 2 -type l -print -exec readlink {} \;
+find workspace -maxdepth 2 -type l -print -exec readlink {} \;
 ```
 
 AgentへDropbox全体やデータroot全体を見せず、必要なsubpathだけlinkします。
@@ -857,7 +860,7 @@ project repositoryがなければcloneします。
 cd ~/src
 gh repo clone hase62/Sepsis.Atlas
 cd Sepsis.Atlas
-setup-project-links
+setup-workspace
 ```
 
 同じtask名でlocal worktreeを再構築します。
@@ -873,7 +876,7 @@ git status
 code .
 ```
 
-`new-worktree`は`origin/work/metadata-audit`を検出し、tracking branchとlocal worktreeを作ります。Git管理された指示・code・handoffはbranchから復元され、`.local` linkはそのPC向けに再生成されます。共有dataと永続outputはDropboxの同じ論理pathを参照します。
+`new-worktree`は`origin/work/metadata-audit`を検出し、tracking branchとlocal worktreeを作ります。Git管理された指示・code・handoffはbranchから復元され、`workspace` linkはそのPC向けに再生成されます。共有dataと永続outputはDropboxの同じ論理pathを参照します。
 
 ### 元PCへ戻る
 
@@ -950,7 +953,7 @@ git push origin --delete work/metadata-audit
 
 squash mergeではGitがlocal branchをmerge済みと判定せず、`--delete-branch`がbranchを残す場合があります。PRとmainへの反映を確認した後の手動削除方法は[`docs/WORKTREES.md`](docs/WORKTREES.md)を参照してください。
 
-未commit変更があるworktreeは削除されません。`.local/output`がlocal scratchを指している場合、必要な成果物をDropboxへ保存済みかも削除前に確認します。
+未commit変更があるworktreeは削除されません。`workspace/output`がlocal scratchを指している場合、必要な成果物をDropboxへ保存済みかも削除前に確認します。
 
 ## 8.8 独立review用worktree
 
@@ -1045,7 +1048,7 @@ Agentが作業開始時に読むべきMarkdownや規約は、必ずGitへcommit�
 - 再生成コストが高い成果物
 - 最終解析結果、figure元data、release候補
 
-Dropboxの既存directory構造は変更せず、projectから必要なsubpathだけ`.local/data/`または`.local/output`へlinkします。
+Dropboxの既存directory構造は変更せず、projectから必要なsubpathだけ`workspace/data/`または`workspace/output`へlinkします。
 
 ## local-onlyとして許容するもの
 
@@ -1054,16 +1057,16 @@ Dropboxの既存directory構造は変更せず、projectから必要なsubpath�
 - downloaded package cache
 - temporary file
 - 再生成可能なscratch・cache
-- worktree folderと`.local/`のsymlink構造
+- worktree folderと`workspace/`のsymlink構造
 - 実行中processとAgent chat session
 
 標準local scratch：
 
 ```text
-~/scratch/<Project>/<Workspace>/
+~/scratch/<Project>/<checkout-name>/
 ```
 
-`.local/scratch`と、共有先を指定していない`.local/output`は、端末を替えると失われても再生成できるものだけに使います。
+`workspace/scratch`と、共有先を指定していない`workspace/output`は、端末を替えると失われても再生成できるものだけに使います。
 
 ## project固有local disk / HPC
 
@@ -1132,11 +1135,11 @@ git branch --show-current
 |---|---|
 | `bash scripts/bootstrap-ubuntu.sh` | WSL2 Ubuntuへ基本toolを導入 |
 | `bash scripts/bootstrap-macos.sh` | macOSへHomebrewと基本toolを導入 |
-| `bash scripts/setup-machine.sh` | Dropbox root、共通directory、commandを設定 |
+| `bash scripts/setup-machine.sh` | Dropbox実体path、共通directory、commandを設定 |
 | `new-project` | 新規projectを作成 |
 | `new-worktree` | sharedまたはAgent別worktreeを作成 |
 | `remove-worktree` | local worktreeを安全に削除し、必要ならlocal branchも削除 |
-| `setup-project-links` | `.local`のdata / scratch / output linkを生成 |
+| `setup-workspace` | `scripts/configure-workspace.sh`から`workspace/`を再構築 |
 | `research-doctor` | machineとprojectを診断 |
 | `install-coding-agents` | CodexとClaude Codeを導入 |
 | `setup-vscode` | OSに応じたVS Code extensionを導入 |
@@ -1151,6 +1154,7 @@ help：
 new-project --help
 new-worktree --help
 remove-worktree --help
+setup-workspace --help
 install-miniforge --help
 install-coding-agents --help
 setup-vscode --help
@@ -1166,7 +1170,7 @@ setup-emacs --help
 
 - Agentは対象repositoryまたはworktreeから起動する。
 - Dropbox root、`~/src` root、home directoryから起動しない。
-- 必要な入力だけ `.local/data/` にlinkする。
+- 必要な入力だけ `workspace/data/` にlinkする。
 - secret、token、`.env`をrepositoryへ置かない。
 - 入力データを直接変更させない。
 - commit、push、merge、rebaseは人間が差分確認後に行う。

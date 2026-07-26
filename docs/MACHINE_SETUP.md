@@ -83,15 +83,18 @@ source ~/.zshrc
 
 実行内容：
 
-1. `~/src`、`~/worktrees`、`~/scratch`、`~/data-roots`を作成
-2. Dropboxの2ルートを `~/data-roots/` へsymlink
-3. `~/.research_env`を生成
+1. `~/src`、`~/worktrees`、`~/scratch`を作成
+2. Dropbox実体のpathを検出
+3. `RESEARCH_ROOT`と`LARGE_ROOT`が実体を直接指す`~/.research_env`を生成
 4. WSL2では `~/.bashrc`、macOSでは `~/.zshrc`から読み込む設定を追加
 5. `~/.local/bin`へ共通commandを登録
+6. 旧版の`~/data-roots/`に既知symlinkだけが残っていれば安全に削除
+
+`~/data-roots/`の中継directoryは作りません。Dropboxの場所はOSごとに異なりますが、project側は共通の`RESEARCH_ROOT`と`LARGE_ROOT`だけを使用します。
 
 ## projectの共有dataとoutput
 
-machine全体の `LOCAL_ROOT` は定義しません。通常はDropboxの共通論理rootを使い、どのPCでも同じ`scripts/setup-local-links.sh`からlinkを再構築します。
+machine全体の `LOCAL_ROOT` は定義しません。通常はDropboxの共通論理rootを使い、どのPCでも同じ`scripts/configure-workspace.sh`からlinkを再構築します。
 
 ```bash
 link_data "$RESEARCH_ROOT/Papers/ProteomicAging" papers
@@ -106,7 +109,7 @@ PC固有pathは、共有不要かつ再生成可能なcacheなどに限る例外
 export PROTEOMIC_AGING_LOCAL_CACHE_ROOT="/mnt/e/ProteomicAging/cache"  # WSL2例
 # export PROTEOMIC_AGING_LOCAL_CACHE_ROOT="/Volumes/ExternalSSD/ProteomicAging/cache"  # macOS例
 
-# scripts/setup-local-links.sh（Git管理）
+# scripts/configure-workspace.sh（Git管理）
 if [[ -n "${PROTEOMIC_AGING_LOCAL_CACHE_ROOT:-}" ]]; then
   link_data "$PROTEOMIC_AGING_LOCAL_CACHE_ROOT" local_cache
 fi

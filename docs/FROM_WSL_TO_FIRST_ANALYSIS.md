@@ -6,7 +6,7 @@
 
 - codeはWSL2の`~/src/<Project>`へ置く。
 - Dropboxの既存構造は変更しない。
-- 必要なデータだけprojectの`.local/data/`へlinkする。
+- 必要なデータだけprojectの`workspace/data/`へlinkする。
 - VS Codeを標準UIとし、Codex／Claude Code extensionを使う。
 - 長いtaskはtask worktreeとGitHub branchで管理する。
 
@@ -103,12 +103,17 @@ bash scripts/setup-machine.sh \
 確認：
 
 ```bash
-ls -ld ~/data-roots/Research
-ls -ld ~/data-roots/ForShareLargeData
+source ~/.research_env
+printf 'RESEARCH_ROOT=%s\n' "$RESEARCH_ROOT"
+printf 'LARGE_ROOT=%s\n' "$LARGE_ROOT"
+ls -ld "$RESEARCH_ROOT" "$LARGE_ROOT"
 command -v new-project
 command -v new-worktree
+command -v setup-workspace
 research-doctor
 ```
+
+Dropbox実体は`RESEARCH_ROOT`と`LARGE_ROOT`から直接参照し、`~/data-roots/`の中継directoryは作りません。
 
 ## 6. VS Codeを設定する
 
@@ -166,7 +171,7 @@ cd ~/src
 gh repo clone hase62/Sepsis.Atlas
 cd Sepsis.Atlas
 
-setup-project-links
+setup-workspace
 research-doctor Sepsis.Atlas
 ```
 
@@ -183,7 +188,7 @@ analysis-smoke-test Sepsis.Atlas
 ```bash
 cd ~/src/Sepsis.Atlas
 git pull --rebase
-setup-project-links
+setup-workspace
 ```
 
 ## 9. 新規projectを作る
@@ -197,13 +202,13 @@ cd ~/src/NewProject
 
 ```text
 PROJECT.md
-scripts/setup-local-links.sh
+scripts/configure-workspace.sh
 ```
 
 linkを反映します。
 
 ```bash
-setup-project-links
+setup-workspace
 research-doctor NewProject
 ```
 
@@ -261,4 +266,4 @@ git commit -m "WIP: checkpoint current task"
 git push
 ```
 
-別PCでは同じtask名で`new-worktree`を実行し、GitHub上のtask branchからlocal worktreeを再構築します。大きなdataと必要なoutputはDropboxから参照します。未commit変更、`.local`のlinkそのもの、conda環境、再生成可能な`~/scratch`、Agent chat sessionは移動しません。
+別PCでは同じtask名で`new-worktree`を実行し、GitHub上のtask branchからlocal worktreeを再構築します。大きなdataと必要なoutputはDropboxから参照します。未commit変更、`workspace`のlinkそのもの、conda環境、再生成可能な`~/scratch`、Agent chat sessionは移動しません。

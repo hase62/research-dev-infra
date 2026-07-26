@@ -118,16 +118,12 @@ else
   ACTION="created from $BASE"
 fi
 
-mkdir -p "$TARGET/.local/data"
-printf '%s\n' "$WORKSPACE" > "$TARGET/.local/workspace-name"
+mkdir -p "$TARGET/workspace/data"
 
-if [[ -x "$TARGET/scripts/setup-local-links.sh" ]]; then
-  PROJECT_ROOT="$TARGET" WORKSPACE_NAME="$WORKSPACE" bash "$TARGET/scripts/setup-local-links.sh"
-elif [[ -d "$REPO/.local/data" ]]; then
-  cp -a "$REPO/.local/data/." "$TARGET/.local/data/"
-  mkdir -p "$SCRATCH_ROOT/$PROJECT/$WORKSPACE/scratch" "$SCRATCH_ROOT/$PROJECT/$WORKSPACE/output"
-  replace_symlink "$SCRATCH_ROOT/$PROJECT/$WORKSPACE/scratch" "$TARGET/.local/scratch"
-  replace_symlink "$SCRATCH_ROOT/$PROJECT/$WORKSPACE/output" "$TARGET/.local/output"
+if [[ -x "$TARGET/scripts/configure-workspace.sh" ]]; then
+  PROJECT_ROOT="$TARGET" WORKSPACE_NAME="$WORKSPACE" bash "$TARGET/scripts/configure-workspace.sh"
+else
+  warn "scripts/configure-workspace.sh is missing; workspace links were not created"
 fi
 
 info "Worktree ready"

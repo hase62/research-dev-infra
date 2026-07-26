@@ -70,12 +70,11 @@ mkdir -p "$PROJECT_DIR" "$WORKTREE_ROOT/$PROJECT" "$SCRATCH_ROOT/$PROJECT"
 cp -a "$INFRA_ROOT/templates/project/." "$PROJECT_DIR/"
 replace_placeholder "$PROJECT_DIR" "__PROJECT_NAME__" "$PROJECT"
 mkdir -p "$PROJECT_DIR/analysis" "$PROJECT_DIR/docs" "$PROJECT_DIR/handoffs" "$PROJECT_DIR/tasks" "$PROJECT_DIR/tests"
-touch "$PROJECT_DIR/analysis/.gitkeep" "$PROJECT_DIR/docs/.gitkeep" "$PROJECT_DIR/handoffs/.gitkeep" "$PROJECT_DIR/tasks/.gitkeep" "$PROJECT_DIR/tests/.gitkeep"
-mkdir -p "$PROJECT_DIR/.local/data"
-printf 'main\n' > "$PROJECT_DIR/.local/workspace-name"
-chmod +x "$PROJECT_DIR/scripts/setup-local-links.sh"
+touch "$PROJECT_DIR/analysis/.gitkeep" "$PROJECT_DIR/docs/.gitkeep" "$PROJECT_DIR/tasks/.gitkeep" "$PROJECT_DIR/tests/.gitkeep"
+mkdir -p "$PROJECT_DIR/workspace/data"
+chmod +x "$PROJECT_DIR/scripts/configure-workspace.sh"
 
-PROJECT_ROOT="$PROJECT_DIR" WORKSPACE_NAME="main" bash "$PROJECT_DIR/scripts/setup-local-links.sh"
+PROJECT_ROOT="$PROJECT_DIR" WORKSPACE_NAME="main" bash "$PROJECT_DIR/scripts/configure-workspace.sh"
 
 git -C "$PROJECT_DIR" init -b main >/dev/null
 git -C "$PROJECT_DIR" add .
@@ -106,8 +105,8 @@ echo
 echo "Next steps:"
 echo "  cd '$PROJECT_DIR'"
 echo "  edit PROJECT.md"
-echo "  edit scripts/setup-local-links.sh"
-echo "  setup-project-links"
+echo "  edit scripts/configure-workspace.sh"
+echo "  setup-workspace"
 echo "  code ."
 if [[ "$CREATE_GITHUB" != true ]]; then
   echo "  connect the repository to GitHub when ready"

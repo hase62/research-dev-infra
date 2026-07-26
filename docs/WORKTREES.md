@@ -184,7 +184,7 @@ Dropbox
   data、大きな中間・最終成果物
 ```
 
-worktree folder、`.local/`、環境、scratchは再構築対象であり、正本ではありません。
+worktree folder、`workspace/`、環境、scratchは再構築対象であり、正本ではありません。
 
 ### PC A
 
@@ -212,7 +212,7 @@ repositoryがなければcloneします。
 cd ~/src
 gh repo clone hase62/Sepsis.Atlas
 cd Sepsis.Atlas
-setup-project-links
+setup-workspace
 ```
 
 同じtask名でworktreeを再構築します。
@@ -228,7 +228,7 @@ git status
 code .
 ```
 
-`new-worktree`は`origin/work/metadata-audit`を検出し、tracking branchを作ります。Git管理された指示・code・handoffはbranchから復元され、`.local` linkはPC B向けに再生成されます。共有dataと永続outputはDropboxの同じ論理pathを参照します。
+`new-worktree`は`origin/work/metadata-audit`を検出し、tracking branchを作ります。Git管理された指示・code・handoffはbranchから復元され、`workspace` linkはPC B向けに再生成されます。共有dataと永続outputはDropboxの同じ論理pathを参照します。
 
 ### PC Aへ戻る
 
@@ -274,7 +274,7 @@ Dropbox経由で移動するもの：
 
 ```text
 未commit変更
-.local linkそのもの
+workspace linkそのもの
 conda/mamba環境
 再生成可能な~/scratch output
 実行中process
@@ -291,7 +291,7 @@ credential・token
 - commit・push後、working treeをcleanにする。
 - worktree folderをDropboxへ置かない。
 - Agent chat sessionの同期を前提にせず、handoffとcommitを正本にする。
-- `.local`と解析環境は各PCで再構築する。
+- `workspace`と解析環境は各PCで再構築する。
 
 ## 9. taskを完了する
 

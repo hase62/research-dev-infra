@@ -5,11 +5,11 @@ Research code and documentation for **__PROJECT_NAME__**.
 ## Local setup
 
 ```bash
-setup-project-links
+setup-workspace
 research-doctor __PROJECT_NAME__
 ```
 
-Shared data and outputs are exposed under `.local/`; the links themselves are not tracked by Git. `.local/` is not a private storage area. Persistent text/code belongs in GitHub, and large persistent artifacts belong in Dropbox or the documented shared store. Read `PROJECT.md` before starting Codex or Claude Code.
+Shared data and outputs are exposed under `workspace/`; the links themselves are not tracked by Git. `workspace/` is not a private storage area. Persistent text/code belongs in GitHub, and large persistent artifacts belong in Dropbox or the documented shared store. Read `PROJECT.md` before starting Codex or Claude Code.
 
 ## Open in Visual Studio Code
 
@@ -54,7 +54,7 @@ git fetch --all --prune
 new-worktree __PROJECT_NAME__ shared metadata-audit
 ```
 
-`new-worktree` resumes `origin/work/metadata-audit` and recreates local `.local` links. GitHub carries code, instructions, and handoff notes; Dropbox carries shared data and large persistent outputs. Uncommitted changes, local environments, reproducible scratch outputs, and Agent chat sessions do not move between computers. Record the current state and shared output paths in `handoffs/CURRENT.md`.
+`new-worktree` resumes `origin/work/metadata-audit` and recreates local `workspace` links. GitHub carries code, instructions, and handoff notes; Dropbox carries shared data and large persistent outputs. Uncommitted changes, local environments, reproducible scratch outputs, and Agent chat sessions do not move between computers. Record the current state and shared output paths in `handoffs/CURRENT.md`.
 
 ## Edit with Emacs
 

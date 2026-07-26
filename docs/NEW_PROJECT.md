@@ -33,16 +33,16 @@ new-project Sepsis.Atlas --github my-organization/Sepsis.Atlas
 ├── docs/
 ├── handoffs/
 ├── scripts/
-│   └── setup-local-links.sh
+│   └── configure-workspace.sh
 ├── tasks/
 ├── tests/
-└── .local/
+└── workspace/
     ├── data/
     ├── output -> ~/scratch/Sepsis.Atlas/main/output
     └── scratch -> ~/scratch/Sepsis.Atlas/main/scratch
 ```
 
-`.local/`はGit管理されませんが、fileの正本を置く場所ではありません。共有dataと永続outputへのsymlink、およびlocal scratchへのsymlinkをまとめるlink層です。標準のworking outputは`~/scratch/`以下ですが、別PCで必要になるoutputはDropbox上の共有directoryへ切り替えます。
+`workspace/`はGit管理されませんが、fileの正本を置く場所ではありません。共有dataと永続outputへのsymlink、およびlocal scratchへのsymlinkをまとめるlink層です。標準のworking outputは`~/scratch/`以下ですが、別PCで必要になるoutputはDropbox上の共有directoryへ切り替えます。
 
 ## 2. PROJECT.mdを書く
 
@@ -65,7 +65,7 @@ new-project Sepsis.Atlas --github my-organization/Sepsis.Atlas
 ## 3. 必要なデータだけリンクする
 
 ```bash
-nano scripts/setup-local-links.sh
+nano scripts/configure-workspace.sh
 ```
 
 ファイル末尾のproject-specific linksへ追加します。
@@ -90,7 +90,7 @@ use_output_dir "$LARGE_ROOT/ProteomicAging/results/$WORKSPACE_NAME"
 export PROTEOMIC_AGING_LOCAL_CACHE_ROOT="/mnt/e/ProteomicAging/cache"  # WSL2
 # export PROTEOMIC_AGING_LOCAL_CACHE_ROOT="/Volumes/ExternalSSD/ProteomicAging/cache"  # macOS
 
-# scripts/setup-local-links.sh（Gitへcommit）
+# scripts/configure-workspace.sh（Gitへcommit）
 if [[ -n "${PROTEOMIC_AGING_LOCAL_CACHE_ROOT:-}" ]]; then
   link_data "$PROTEOMIC_AGING_LOCAL_CACHE_ROOT" local_cache
 fi
@@ -105,13 +105,13 @@ fi
 
 ```bash
 cd ~/src/Sepsis.Atlas
-setup-project-links
+setup-workspace
 ```
 
 確認：
 
 ```bash
-find .local -maxdepth 2 -type l -print -exec readlink {} \;
+find workspace -maxdepth 2 -type l -print -exec readlink {} \;
 research-doctor Sepsis.Atlas
 ```
 
@@ -120,12 +120,12 @@ research-doctor Sepsis.Atlas
 `new-project --github`を使った場合、初期雛形はすでにpushされています。編集した内容だけcommitします。
 
 ```bash
-git add PROJECT.md scripts/setup-local-links.sh
+git add PROJECT.md scripts/configure-workspace.sh
 git commit -m "Configure project data and output links"
 git push
 ```
 
-データ本体やsymlinkは `.local/`配下なのでcommitされません。一方、どの共有pathを使うかを定義する`scripts/setup-local-links.sh`はcommitします。通常はDropboxの共通rootからのpathだけを記述し、PC固有pathは例外的な環境変数として扱います。
+データ本体やsymlinkは `workspace/`配下なのでcommitされません。一方、どの共有pathを使うかを定義する`scripts/configure-workspace.sh`はcommitします。通常はDropboxの共通rootからのpathだけを記述し、PC固有pathは例外的な環境変数として扱います。
 
 ## 5. VS Codeで作業を始める
 
@@ -165,7 +165,7 @@ GITHUB_ACCOUNT="hase62"
 cd ~/src
 gh repo clone "$GITHUB_ACCOUNT/Sepsis.Atlas"
 cd Sepsis.Atlas
-setup-project-links
+setup-workspace
 research-doctor Sepsis.Atlas
 ```
 
@@ -181,7 +181,7 @@ cd ~/worktrees/Sepsis.Atlas/shared-metadata-audit
 code .
 ```
 
-移動元PCでは、先に`handoffs/CURRENT.md`を更新し、checkpoint commitをpushします。別PCでも必要な大きなoutputはDropboxへ保存します。未commit変更、`.local`のlink、解析環境、再生成可能なscratch、Agent chat sessionは別PCへ移りません。
+移動元PCでは、先に`handoffs/CURRENT.md`を更新し、checkpoint commitをpushします。別PCでも必要な大きなoutputはDropboxへ保存します。未commit変更、`workspace`のlink、解析環境、再生成可能なscratch、Agent chat sessionは別PCへ移りません。
 
 ## 新しい端末から始める場合
 

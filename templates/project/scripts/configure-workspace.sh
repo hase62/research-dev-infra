@@ -27,22 +27,26 @@ replace_link() {
   ln -s "$source_path" "$link_path"
 }
 
-mkdir -p "$PROJECT_ROOT/.local/data"
-
-WORKSPACE_NAME="${WORKSPACE_NAME:-}"
-if [[ -z "$WORKSPACE_NAME" && -f "$PROJECT_ROOT/.local/workspace-name" ]]; then
-  WORKSPACE_NAME="$(cat "$PROJECT_ROOT/.local/workspace-name")"
+if [[ -n "${WORKSPACE_NAME:-}" ]]; then
+  :
+elif [[ -d "$PROJECT_ROOT/.git" ]]; then
+  WORKSPACE_NAME="main"
+else
+  WORKSPACE_NAME="$(basename "$PROJECT_ROOT")"
 fi
-WORKSPACE_NAME="${WORKSPACE_NAME:-main}"
-printf '%s\n' "$WORKSPACE_NAME" > "$PROJECT_ROOT/.local/workspace-name"
 
-WORKSPACE_DIR="$SCRATCH_ROOT/$PROJECT_NAME/$WORKSPACE_NAME"
-SCRATCH_DIR="$WORKSPACE_DIR/scratch"
-OUTPUT_DIR="$WORKSPACE_DIR/output"
+mkdir -p "$PROJECT_ROOT/workspace/data"
+while IFS= read -r stale_link; do
+  rm -f "$stale_link"
+done < <(find "$PROJECT_ROOT/workspace/data" -mindepth 1 -maxdepth 1 -type l -print 2>/dev/null)
+
+LOCAL_WORKSPACE_DIR="$SCRATCH_ROOT/$PROJECT_NAME/$WORKSPACE_NAME"
+SCRATCH_DIR="$LOCAL_WORKSPACE_DIR/scratch"
+OUTPUT_DIR="$LOCAL_WORKSPACE_DIR/output"
 
 mkdir -p "$SCRATCH_DIR" "$OUTPUT_DIR"
-replace_link "$SCRATCH_DIR" "$PROJECT_ROOT/.local/scratch"
-replace_link "$OUTPUT_DIR" "$PROJECT_ROOT/.local/output"
+replace_link "$SCRATCH_DIR" "$PROJECT_ROOT/workspace/scratch"
+replace_link "$OUTPUT_DIR" "$PROJECT_ROOT/workspace/output"
 
 link_data() {
   local source_path="$1"
@@ -53,7 +57,7 @@ link_data() {
     return 1
   fi
 
-  replace_link "$source_path" "$PROJECT_ROOT/.local/data/$link_name"
+  replace_link "$source_path" "$PROJECT_ROOT/workspace/data/$link_name"
 
   if [[ ! -e "$source_path" ]]; then
     echo "WARNING: target does not currently exist: $source_path" >&2
@@ -64,15 +68,15 @@ use_output_dir() {
   local source_path="$1"
   mkdir -p "$source_path"
   OUTPUT_DIR="$source_path"
-  replace_link "$OUTPUT_DIR" "$PROJECT_ROOT/.local/output"
+  replace_link "$OUTPUT_DIR" "$PROJECT_ROOT/workspace/output"
 }
 
 # -----------------------------------------------------------------------------
-# Project-specific data links
+# Project-specific workspace links
 #
 # Add only the shared Dropbox directories needed by this project.
 # Keep Dropbox's existing directory structure unchanged.
-# This tracked script should reconstruct the same logical links on every PC.
+# This tracked script reconstructs the same logical workspace on every PC.
 #
 # Shared input examples:
 # link_data "$RESEARCH_ROOT/Papers/ExampleProject" papers
@@ -81,8 +85,8 @@ use_output_dir() {
 # Persistent output shared across PCs (recommended):
 # use_output_dir "$LARGE_ROOT/ExampleProject/results/$WORKSPACE_NAME"
 #
-# If use_output_dir is omitted, .local/output points to local scratch and must
-# contain only reproducible/disposable working output.
+# If use_output_dir is omitted, workspace/output points to local scratch and
+# must contain only reproducible/disposable working output.
 #
 # Rare machine-specific cache example. Define EXAMPLE_LOCAL_CACHE_ROOT in
 # ~/.research_env on only the relevant PC; do not hard-code a PC-specific path:
@@ -90,12 +94,12 @@ use_output_dir() {
 #   link_data "$EXAMPLE_LOCAL_CACHE_ROOT" local_cache
 # fi
 #
-# There is intentionally no machine-wide LOCAL_ROOT.
+# There is intentionally no machine-wide local-data root or ~/data-roots layer.
 # -----------------------------------------------------------------------------
 
 
-echo "Local links configured for $PROJECT_NAME ($WORKSPACE_NAME):"
-echo "  data:    $PROJECT_ROOT/.local/data"
+echo "Workspace configured for $PROJECT_NAME ($WORKSPACE_NAME):"
+echo "  data:    $PROJECT_ROOT/workspace/data"
 echo "  scratch: $SCRATCH_DIR"
 echo "  output:  $OUTPUT_DIR"
 if [[ "$OUTPUT_DIR" == "$SCRATCH_ROOT/"* ]]; then
