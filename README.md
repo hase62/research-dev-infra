@@ -16,6 +16,7 @@ WSL2またはmacOS上で、GitHub、Dropbox、VS Code、Emacs、Codex、Claude C
 - 必要なデータだけ各projectの `.local/data/` にsymlinkする。
 - 大規模データ、秘密情報、解析中の出力はGitHubへ入れない。
 - CodexとClaude Codeはproject repositoryまたは専用worktreeの中から起動する。
+- worktree folder自体は端末localであり、端末間で共有する単位はGitHubへpushしたtask branchとcommitである。
 - 同じworking treeをCodexとClaude Codeに同時編集させない。
 - 端末固有の設定は `~/.research_env` とprojectの `.local/` に閉じ込める。
 - 解析環境はprojectごとに再構築可能な形で管理する。
@@ -636,37 +637,39 @@ plan承認後、通常modeへ戻して実装します。Claudeの `opusplan` は
 
 ---
 
-# 8. task worktreeとAgent切替
+# 8. task worktree、Agent切替、別端末での継続
 
 ## 8.1 worktreeとは何か
 
-Git worktreeは、**同じGit repositoryを別のfolderへもう1つcheckoutする仕組み**です。
-通常のproject本体は次にあります。
-
-```text
-~/src/Sepsis.Atlas
-```
-
-長いtask用のworktreeを作ると、例えば次が追加されます。
-
-```text
-~/worktrees/Sepsis.Atlas/shared-task-001-inventory
-```
-
-この2つは同じcommit履歴とGit objectを共有しますが、表示しているbranchと作業fileは別です。
-したがって、task側で多数のfileを変更しても、`~/src/Sepsis.Atlas`のmain working treeは汚れません。
+Git worktreeは、**同じGit repositoryの別branchを別folderへcheckoutする仕組み**です。
 
 ```text
 ~/src/Sepsis.Atlas
   branch: main
-  用途: 最新mainの確認、merge後の同期、短いread-only確認
 
 ~/worktrees/Sepsis.Atlas/shared-task-001-inventory
   branch: work/task-001-inventory
-  用途: task-001の設計、実装、test、Agent切替
 ```
 
-worktreeはrepository全体を完全複製する仕組みではありません。Git履歴を共有するため、通常のcloneを何個も作るより軽量です。一方、tracked fileはworktreeごとに独立して存在します。
+main checkoutをcleanな入口として残し、長いtaskの変更をtask worktreeへ分離できます。Git履歴とobjectは共有しますが、tracked file、現在branch、未commit変更はworktreeごとに独立します。
+
+重要なのは、`~/worktrees/...`というfolderはそのPCにしか存在しないことです。GitHubへ共有されるのはfolderではなく、**commitしてpushしたtask branch**です。
+
+```text
+GitHubへ移動するもの
+  task branchのcommit
+  trackedされたcode、設定、documentation
+  handoffs/CURRENT.md
+
+そのPCにだけ残るもの
+  未commitの変更
+  .local/ symlink
+  conda/mamba環境
+  ~/scratch以下の一時output
+  Codex/Claude Codeの実行中processやchat session
+```
+
+したがって、別PCへ移る前には、途中でもcheckpoint commitを作ってtask branchをpushします。private repositoryのtask branchなので、commit messageを`WIP:`としても構いません。必要ならtask完了時にsquashまたはrebaseします。
 
 ## 8.2 いつworktreeを使うか
 
@@ -676,14 +679,15 @@ worktreeはrepository全体を完全複製する仕組みではありません�
 | 数fileだけの明確な小修正 | `~/src/<Project>`でもよい |
 | 数時間以上の実装、解析pipeline変更 | shared task worktree |
 | CodexとClaude Codeを途中で切り替えるtask | shared task worktree |
+| 別PCで続きを行う可能性がある長いtask | shared task worktree + remote task branch |
 | 2つのtaskを並行して進める | taskごとに別worktree |
 | 実装とは分離した独立review | review専用worktree |
 
-すべての操作にworktreeを使う必要はありません。**長くなる、変更範囲が広い、別Agentへ引き継ぐ可能性がある**場合に使います。
+worktreeの使用自体は、別PCでの継続を妨げません。**local worktreeをGitHubへ同期するのではなく、task branchを同期し、各PCでworktreeを再作成します。**
 
-## 8.3 task worktreeを作る
+## 8.3 task worktreeを作る、または既存taskを再開する
 
-作成前にmain checkoutを最新かつcleanにします。`new-worktree`は既定でlocalの`main`をbaseにするため、この更新を先に行います。
+作成前にmain checkoutをcleanにします。
 
 ```bash
 cd ~/src/Sepsis.Atlas
@@ -693,20 +697,31 @@ git pull --rebase
 git status
 ```
 
-`working tree clean`を確認してから作成します。
+次のcommandは、branchの状態に応じて動作を変えます。
 
 ```bash
 new-worktree Sepsis.Atlas shared task-001-inventory
 ```
 
-このcommandは次を作成します。
+```text
+work/task-001-inventoryが存在しない
+  mainから新しいbranchとworktreeを作る
+
+local branchだけ存在する
+  そのbranchを新しいlocal worktreeへ再接続する
+
+origin/work/task-001-inventoryが存在する
+  remote branchをtrackingするlocal branchとworktreeを作り、別PCの続きから再開する
+```
+
+作成先は常に次です。
 
 ```text
 branch: work/task-001-inventory
 path:   ~/worktrees/Sepsis.Atlas/shared-task-001-inventory
 ```
 
-さらに、そのworktree専用の次のlinkを作成します。
+さらに、そのPC専用の次のlinkを再生成します。
 
 ```text
 .local/data
@@ -714,74 +729,50 @@ path:   ~/worktrees/Sepsis.Atlas/shared-task-001-inventory
 .local/output
 ```
 
-## 8.4 VS Codeでworktreeを開く
+同名branchがすでに別worktreeでcheckoutされている場合は停止します。既存worktreeを使うか、不要なら先に`remove-worktree`します。
 
-このworkflowでは、**VS Codeを主要画面として使う方法を標準**にします。
+## 8.4 VS Codeでworktreeを開く
 
 ```bash
 cd ~/worktrees/Sepsis.Atlas/shared-task-001-inventory
 code .
 ```
 
-WSL2では、左下に`WSL: Ubuntu`などが表示されていることを確認します。macOSではlocal folderとして直接開きます。
+このworkflowではVS Codeを主要画面として使います。WSL2では左下に`WSL: Ubuntu`などが表示されていることを確認し、macOSではlocal folderとして開きます。
 
-重要なのは、VS Codeで`~/src/Sepsis.Atlas`ではなく、今作ったworktree folderを開くことです。CodexまたはClaude Code extensionは、現在開いているfolder、active file、選択範囲、Git差分をtask contextとして使用します。
-
-推奨運用：
-
-- 1つのVS Code windowには1つのproject rootまたは1つのworktreeだけを開く。
+- 1つのVS Code windowには1つのproject rootまたはworktreeだけを開く。
 - main checkoutとtask worktreeを同じmulti-root workspaceへ混在させない。
-- window titleまたは左下のGit branch表示で`work/task-001-inventory`を確認する。
-- Python/R環境、Git、test commandはVS Codeの統合terminalから実行する。
+- window titleまたはGit branch表示で`work/task-001-inventory`を確認する。
+- CodexまたはClaude Code extensionは、現在開いているworktreeだけを編集対象にする。
+- Git、conda、R、Python、testはintegrated terminalから実行する。
 
-## 8.5 VS Code extensionとCLIのどちらを使うか
+## 8.5 VS Code extensionとCLI
 
-CodexとClaude Codeは、どちらもVS Code extensionを主要UIとして使用できます。**extensionを使う場合、統合terminalで`codex`または`claude`を起動する必要はありません。**
-
-### Codex
-
-VS CodeのCodex icon、またはCommand Paletteの`Codex: Open Codex Sidebar`から開始します。開いているfileや選択範囲をcontextに追加し、提案されたdiffをVS Code内で確認します。
-
-Codex IDE extensionとCodex CLIは同じ`~/.codex/config.toml`を使用するため、このinfraで設定した`gpt-5.6 / xhigh`が両方へ適用されます。
-
-terminal UIを使いたい場合だけ、統合terminalで次を実行します。
-
-```bash
-codex
-```
-
-### Claude Code
-
-VS CodeのClaude Code iconからsessionを開始します。Plan Mode、inline diff、file参照をVS Code内で使用できます。
-
-Claude Code extensionとstandalone CLIは`~/.claude/settings.json`を共有するため、このinfraで設定した`stable / opus / xhigh`が両方へ適用されます。
-
-terminal UIを使いたい場合だけ、統合terminalで次を実行します。
-
-```bash
-claude
-```
-
-このinfraはextensionとCLIの両方を導入しますが、日常作業では次を推奨します。
+CodexとClaude Codeは、どちらもVS Code extensionを主要UIとして使用できます。extensionを使う場合、integrated terminalで`codex`または`claude`を別途起動する必要はありません。
 
 ```text
-コード閲覧・指示・diff確認: VS Code extension
-Git・conda・R/Python・test: VS Code integrated terminal
-特殊なCLI commandが必要: codex または claude CLI
+Agentとの会話、file参照、diff review
+  VS Code extension
+
+Git、conda、mamba、R、Python、test
+  VS Code integrated terminal
+
+CLI限定機能またはterminal UI
+  codex / claude CLI
 ```
+
+Codex IDE extensionとCLIは`~/.codex/config.toml`を共有します。Claude Code extensionとCLIは`~/.claude/settings.json`を共有します。
 
 ## 8.6 CodexからClaude Codeへ切り替える
 
-両extensionをインストールしておくこと自体は問題ありません。ただし、**同じworktreeへ同時に編集指示を出してはいけません。**
+両extensionを導入しておくことは問題ありません。ただし、同じworktreeへ同時に編集指示を出しません。
 
-切替手順：
-
-1. Codexのtaskを停止し、実行中commandがないことを確認する。
-2. VS CodeのSource Controlまたはterminalで変更を確認する。
-3. `handoffs/CURRENT.md`へ現在地を短く記録する。
-4. 可能なら意味のある単位でcheckpoint commitを作る。
-5. Claude Code extensionを同じVS Code windowで開始する。
-6. ClaudeへhandoffとGit差分を先に読ませる。
+1. 現在のAgentのtaskと実行中commandを停止する。
+2. Source Controlまたはterminalで変更を確認する。
+3. `handoffs/CURRENT.md`へ現在地を記録する。
+4. 可能ならcheckpoint commitを作る。
+5. 同じVS Code windowで次のAgentを開始する。
+6. 次のAgentへhandoff、status、diffを先に確認させる。
 
 ```bash
 git status
@@ -804,22 +795,101 @@ Agent切替時の最初の指示例：
 
 ```text
 PROJECT.md、CLAUDE.md、handoffs/CURRENT.mdを読み、git statusとgit diffを確認してください。
-前Agentの実装を無条件に信頼せず、現在のscientific assumptionsと未完了点を確認してから続行してください。
+前Agentの実装を無条件に信頼せず、scientific assumptions、未完了点、未実行testを確認してから続行してください。
 ```
 
-CodexとClaude Codeのchat履歴は自動では引き継がれません。引継ぎの正本は、repository内のinstruction file、`handoffs/CURRENT.md`、commit、`git diff`です。
+同じPC・同じworktreeで切り替える場合は未commit変更も次のAgentから見えます。一方、別PCへ移る場合は未commit変更が移動しないため、必ずcommitとpushが必要です。
 
-変更がまだ不完全でcommitできない場合は、未commitのまま切り替えても構いません。同じworktreeなので次のAgentから変更は見えます。ただし、handoffに「未commitである理由」と「壊れている可能性がある箇所」を明記します。
+## 8.7 別PCでtaskを続ける
 
-## 8.7 taskを完了する
+### PC A：外出前または端末移動前
 
-実装、test、結果確認が終わったら、task branchへcommitしてpushします。
+Agentを停止し、handoffを更新します。途中段階でも、再開可能な状態をcheckpoint commitとして保存します。
 
 ```bash
 cd ~/worktrees/Sepsis.Atlas/shared-task-001-inventory
 
 git status
+git diff --stat
+
+# handoffs/CURRENT.mdも更新する
+git add <確認したfile>
+git commit -m "WIP: checkpoint task 001 inventory"
+git push -u origin work/task-001-inventory
+
+git status
+```
+
+最後の`git status`がcleanであることを確認します。
+
+Git管理しない大きな中間outputが必要なら、Dropbox、HPC、project固有の永続diskなど、両端末から到達可能な場所へ保存し、そのpathと再生成方法を`handoffs/CURRENT.md`へ記録します。`~/scratch`だけにあるoutputは別PCへ移りません。
+
+### PC B：同じtaskを再構築する
+
+project repositoryがまだなければcloneします。
+
+```bash
+cd ~/src
+gh repo clone hase62/Sepsis.Atlas
+```
+
+remote branchを取得し、PC Aと**同じ`new-worktree` command**を実行します。
+
+```bash
+cd ~/src/Sepsis.Atlas
+
+git fetch --all --prune
+git switch main
+git pull --rebase
+
+new-worktree Sepsis.Atlas shared task-001-inventory
+
+cd ~/worktrees/Sepsis.Atlas/shared-task-001-inventory
+git branch -vv
+git status
+code .
+```
+
+`new-worktree`が`origin/work/task-001-inventory`を検出し、tracking branchとしてworktreeを再作成します。`.local` linkとlocal scratch/outputもそのPC向けに再生成されます。
+
+VS Codeを開いたら、まず`PROJECT.md`、Agent instruction、`handoffs/CURRENT.md`を読ませます。Codex／Claude Codeのchat sessionが別PCへ引き継がれることは前提にしません。
+
+### 再びPC Aへ戻る
+
+PC Bでcommit・pushしてから、PC Aの既存worktreeを更新します。
+
+```bash
+cd ~/worktrees/Sepsis.Atlas/shared-task-001-inventory
+
+git status                 # cleanであること
+git fetch origin
+git pull --rebase
+```
+
+PC Aでworktreeを削除済みなら、同じcommandで再構築できます。
+
+```bash
+new-worktree Sepsis.Atlas shared task-001-inventory
+```
+
+### 重要な制約
+
+- 同じtask branchを2台で同時編集しない。
+- 端末を替える前に、Agentを停止し、commit・pushし、working treeをcleanにする。
+- 未commit変更はGitHubへ移らない。
+- worktree folderをDropbox同期対象にしない。
+- conda環境と`.local` linkは各端末で再構築する。
+- Agentのchat履歴ではなく、commitと`handoffs/CURRENT.md`を引継ぎの正本にする。
+
+commitまたはpushを忘れた変更は、元PCへアクセスしない限りGitHubから復元できません。
+
+## 8.8 taskを完了する
+
+```bash
+cd ~/worktrees/Sepsis.Atlas/shared-task-001-inventory
+
 # project固有のtestを実行
+git status
 git add -A
 git commit -m "Complete task 001 inventory"
 git push -u origin work/task-001-inventory
@@ -841,7 +911,7 @@ git switch main
 git pull --rebase
 ```
 
-VS Codeのtask windowを閉じ、worktreeを削除します。
+VS Codeのtask windowを閉じてからworktreeを削除します。
 
 ```bash
 remove-worktree Sepsis.Atlas shared task-001-inventory
@@ -859,9 +929,9 @@ remove-worktree \
 
 未commit変更があるworktreeは削除されません。`.local/output`に残すべき成果物がある場合も、削除前に保存先を確認します。
 
-## 8.8 独立review用worktree
+## 8.9 独立review用worktree
 
-実装とは別のbranchとfolderでreviewしたい場合だけ、review worktreeを作ります。review対象の未commit変更はbaseに含まれないため、先にtask branchへcommitします。
+review対象の未commit変更は別worktreeへ現れないため、先にtask branchへcommitします。
 
 ```bash
 new-worktree \
@@ -878,56 +948,41 @@ cd ~/worktrees/Sepsis.Atlas/claude-review-001
 code .
 ```
 
-単にCodexからClaudeへ作業を続けてほしいだけなら、review worktreeは不要です。同じshared task worktreeで順番に切り替えます。
-
-詳細は[`docs/WORKTREES.md`](docs/WORKTREES.md)を参照してください。
-
 ---
 
-# 9. 日常運用と端末間移動
+# 9. 日常運用
 
-## 作業開始
+## mainで短い作業を開始する
 
 ```bash
 cd ~/src/Sepsis.Atlas
 git fetch --all --prune
+git switch main
 git pull --rebase
 conda activate sepsis-atlas
 ```
 
-worktreeを使う場合：
+## 既存worktreeで同じ端末から再開する
 
 ```bash
 cd ~/worktrees/Sepsis.Atlas/shared-task-001-inventory
+
 git status
+git pull --rebase
+code .
 ```
 
-## 作業終了・別端末へ移る前
+## 別端末でworktree taskを再開する
 
-```bash
-git status
-git diff
-```
-
-必要な変更をcommitしてpushします。
-
-```bash
-git add <確認済みfile>
-git commit -m "Describe completed work"
-git push
-```
-
-別端末では：
+main checkoutでtask branchへ直接`git switch`するのではなく、remote branchからlocal worktreeを再構築します。
 
 ```bash
 cd ~/src/Sepsis.Atlas
 git fetch --all --prune
-git switch <branch>
-git pull --rebase
-setup-project-links
+new-worktree Sepsis.Atlas shared task-001-inventory
 ```
 
-同じbranchを複数端末で同時編集しません。未commit変更を端末間で同期する目的でDropboxを使いません。
+詳細は「8.7 別PCでtaskを続ける」を参照してください。
 
 ---
 

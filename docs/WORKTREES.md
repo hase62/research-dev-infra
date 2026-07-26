@@ -1,4 +1,4 @@
-# Git worktree、VS Code、Codex、Claude Codeの運用
+# Git worktree、VS Code、Agent切替、端末間移動
 
 ## 1. worktreeの役割
 
@@ -12,34 +12,46 @@ Git worktreeは、1つのGit repositoryから複数のworking directoryを作る
   branch: work/task-001-qc-audit
 ```
 
-両者はcommit履歴とGit objectを共有しますが、tracked file、現在branch、未commit変更は別です。
+main checkoutを安定した入口として残し、長い実装をtask worktreeへ隔離します。両者はcommit履歴とGit objectを共有しますが、tracked file、現在branch、未commit変更は別です。
 
-このinfraでは、main checkoutを安定した入口として残し、長い実装をtask worktreeへ隔離します。
+## 2. worktreeはlocal、branchはportable
 
-## 2. 使用基準
+`~/worktrees/...`のfolderは各PCにだけ存在し、GitHubへはuploadされません。ただし、worktreeで使用しているtask branchをcommit・pushすれば、別PCで同じbranchからworktreeを再作成できます。
+
+```text
+GitHub経由で共有される
+  commits
+  task branch
+  tracked files
+  handoffs/CURRENT.md
+
+共有されない
+  uncommitted changes
+  .local links
+  conda/mamba environments
+  ~/scratch outputs
+  running processes and agent chat sessions
+```
+
+このため、端末移動前には途中でもcheckpoint commitを作ります。private task branch上では`WIP:` commitを許容し、必要ならtask完了時に履歴を整理します。
+
+## 3. 使用基準
 
 - read-only確認や非常に小さい修正はmain checkoutでもよい。
 - 数時間以上、複数file、解析pipeline、Agent切替を伴うtaskはshared worktreeを使う。
+- 別PCで続きを行う可能性がある長いtaskもshared worktreeを使い、task branchをpushする。
 - 並行taskはtaskごとに別worktreeを作る。
 - 独立reviewだけ別review worktreeを作る。
 - CodexとClaude Codeを順番に使うだけなら、同じshared worktreeを使う。
 
-## 3. mainを最新化する
-
-`new-worktree`の既定baseはlocalの`main`です。
+## 4. taskを新規作成する
 
 ```bash
 cd ~/src/Sepsis.Atlas
 git switch main
 git pull --rebase
 git status
-```
 
-main checkoutに未commit変更がある場合、`new-worktree`は停止します。先にcommit、stash、または不要な変更の破棄を行います。
-
-## 4. shared task worktreeを作る
-
-```bash
 new-worktree Sepsis.Atlas shared task-001-qc-audit
 ```
 
@@ -50,10 +62,17 @@ branch: work/task-001-qc-audit
 path:   ~/worktrees/Sepsis.Atlas/shared-task-001-qc-audit
 ```
 
-第4引数を省略すると`main`から作ります。別branchまたはcommitをbaseにする場合：
+`new-worktree`はremoteをfetchした後、branch状態に応じて動作します。
 
-```bash
-new-worktree Sepsis.Atlas shared task-002-followup work/task-001-qc-audit
+```text
+branchなし
+  BASE（既定main）から新規作成
+
+local branchあり
+  existing local branchへworktreeを接続
+
+originに同名branchあり
+  tracking local branchを作成してremoteの続きから再開
 ```
 
 ## 5. VS Codeで開く
@@ -63,7 +82,7 @@ cd ~/worktrees/Sepsis.Atlas/shared-task-001-qc-audit
 code .
 ```
 
-1つのVS Code windowには、原則として1つのproject rootまたはworktreeだけを開きます。main checkoutとtask worktreeを同じmulti-root workspaceへ入れると、Agentが変更対象を誤認しやすくなります。
+1つのVS Code windowには、原則として1つのproject rootまたはworktreeだけを開きます。main checkoutとtask worktreeを同じmulti-root workspaceへ入れません。
 
 確認点：
 
@@ -74,53 +93,22 @@ code .
 
 ## 6. VS Code extensionを標準UIとして使う
 
-### Codex
-
-Codex iconまたはCommand Paletteの`Codex: Open Codex Sidebar`から開始します。
-
-- open fileやselected linesをcontextとして渡せる。
-- proposed diffをeditor内で確認できる。
-- `~/.codex/config.toml`はIDE extensionとCLIで共有される。
-- terminal UIが必要な場合だけintegrated terminalで`codex`を実行する。
-
-### Claude Code
-
-Claude Code iconから開始します。
-
-- Plan Mode、inline diff、file referenceをIDE内で使える。
-- `~/.claude/settings.json`はextensionとCLIで共有される。
-- terminal UIが必要な場合だけintegrated terminalで`claude`を実行する。
-
-推奨分担：
-
 ```text
-Agentとの会話、file参照、diff review: VS Code extension
-Git、conda、mamba、R、Python、test: integrated terminal
-CLI限定機能: codex / claude CLI
+Agentとの会話、file参照、diff review
+  VS Code extension
+
+Git、conda、mamba、R、Python、test
+  integrated terminal
+
+CLI限定機能
+  codex / claude CLI
 ```
 
-## 7. local dataとoutput
+Codex extensionとCLIは`~/.codex/config.toml`を共有します。Claude Code extensionとCLIは`~/.claude/settings.json`を共有します。
 
-各worktreeには独立した次のlinkが作られます。
+同じworktreeへCodexとClaude Codeから同時に編集指示を出しません。
 
-```text
-.local/data
-.local/scratch -> ~/scratch/<Project>/<Workspace>/scratch
-.local/output  -> ~/scratch/<Project>/<Workspace>/output
-```
-
-入力データのlinkは`scripts/setup-local-links.sh`から生成されます。project固有のlocal SSDが必要なら、そのscriptで任意の絶対pathを`link_data`します。outputを永続diskへ置く場合は`use_output_dir`を使います。
-
-## 8. Agentを切り替える
-
-原則：
-
-- CodexとClaude Codeは同じshared worktreeを順番に利用できる。
-- 同じworktreeで両者へ同時に編集させない。
-- chat履歴は自動移行しない。
-- repository内のinstruction、handoff、commit、diffを引継ぎ媒体にする。
-
-切替前：
+## 7. 同じPCでAgentを切り替える
 
 ```bash
 git status
@@ -139,9 +127,9 @@ Validation performed
 Important files and caveats
 ```
 
-意味のある単位で安定していればcheckpoint commitを作ります。未完了でcommitできない場合は未commitでもよいですが、handoffへ明記します。
+同じPC・同じworktreeなら未commit変更も次のAgentから見えます。ただし、別PCへ移る可能性がある場合はcheckpoint commitを作ります。
 
-切替後の最初の指示例：
+次のAgentへの最初の指示例：
 
 ```text
 PROJECT.md、AGENTS.mdまたはCLAUDE.md、handoffs/CURRENT.mdを読み、
@@ -149,21 +137,93 @@ git statusとgit diffを確認してください。前Agentの説明を無条件
 scientific assumptions、実装状態、未完了testを独立に確認してから続行してください。
 ```
 
-## 9. Plan Modeとの関係
+## 8. PC AからPC Bへtaskを移す
 
-worktreeとPlan Modeは別の仕組みです。
+### PC A
 
-```text
-worktree:
-  taskのfile変更とbranchをmainから分離するGitの仕組み
+```bash
+cd ~/worktrees/Sepsis.Atlas/shared-task-001-qc-audit
 
-Plan Mode:
-  Agentが変更を始める前に調査と実装planを作る操作mode
+# handoffs/CURRENT.mdを更新
+git status
+git diff --stat
+git add <reviewed-files>
+git commit -m "WIP: checkpoint QC audit"
+git push -u origin work/task-001-qc-audit
+git status
 ```
 
-長いtaskでは、worktreeをVS Codeで開いた後、最初にCodexまたはClaude CodeをPlan Modeにして設計を確認します。plan承認後も同じworktreeで実装を続けます。
+最後にworking treeがcleanであることを確認します。
 
-## 10. taskを完了する
+Git管理しない中間outputが必要なら、Dropbox、HPC、project固有の永続diskへ保存し、pathと再生成方法をhandoffへ書きます。`~/scratch`の内容はPC Bへ移りません。
+
+### PC B
+
+repositoryがなければcloneします。
+
+```bash
+cd ~/src
+gh repo clone hase62/Sepsis.Atlas
+```
+
+同じtask名でworktreeを再構築します。
+
+```bash
+cd ~/src/Sepsis.Atlas
+git fetch --all --prune
+git switch main
+git pull --rebase
+
+new-worktree Sepsis.Atlas shared task-001-qc-audit
+
+cd ~/worktrees/Sepsis.Atlas/shared-task-001-qc-audit
+git branch -vv
+git status
+code .
+```
+
+`new-worktree`は`origin/work/task-001-qc-audit`を検出し、tracking branchを作ります。`.local` linkとscratch/outputはPC B向けに再生成されます。
+
+### PC Aへ戻る
+
+PC Bでcommit・pushした後：
+
+```bash
+cd ~/worktrees/Sepsis.Atlas/shared-task-001-qc-audit
+git status
+git fetch origin
+git pull --rebase
+```
+
+PC Aでworktreeを削除していた場合：
+
+```bash
+new-worktree Sepsis.Atlas shared task-001-qc-audit
+```
+
+## 9. 端末間移動の制約
+
+- 同じtask branchを複数PCで同時編集しない。
+- 移動前にAgentと実行中commandを停止する。
+- commit・push後、working treeをcleanにする。
+- worktree folderをDropboxへ置かない。
+- uncommitted changesはGitHubから復元できない。
+- Agent chat sessionの同期を前提にせず、handoffとcommitを正本にする。
+- `.local`と解析環境は各PCで再構築する。
+
+## 10. Plan Modeとの関係
+
+```text
+worktree
+  taskのbranchとfile変更をmainから分離するGitの仕組み
+
+Plan Mode
+  Agentが変更前に調査と実装planを作る操作mode
+```
+
+長いtaskでは、worktreeをVS Codeで開いた後、最初にPlan Modeで設計を確認します。plan承認後も同じworktreeで実装を続けます。
+
+## 11. taskを完了する
 
 ```bash
 cd ~/worktrees/Sepsis.Atlas/shared-task-001-qc-audit
@@ -205,11 +265,9 @@ remove-worktree \
   --delete-branch
 ```
 
-未commit変更があるworktreeは削除されません。`.local/output`の保存が必要なら削除前に確認します。
+## 12. 独立review worktree
 
-## 11. 独立review worktree
-
-review対象を先にcommitします。未commit変更は別worktreeへ現れません。
+review対象を先にcommitします。uncommitted changesは別worktreeへ現れません。
 
 ```bash
 new-worktree \
@@ -219,13 +277,6 @@ new-worktree \
   work/task-001-qc-audit
 ```
 
-作成物：
-
-```text
-branch: agent/claude/review-001-qc-audit
-path:   ~/worktrees/Sepsis.Atlas/claude-review-001-qc-audit
-```
-
 別のVS Code windowで開きます。
 
 ```bash
@@ -233,26 +284,20 @@ cd ~/worktrees/Sepsis.Atlas/claude-review-001-qc-audit
 code .
 ```
 
-reviewerが変更する場合はreview branchへcommitし、元の実装branchを直接書き換えません。
+## 13. よくある混乱
 
-## 12. よくある混乱
+### 別PCに`~/worktrees/...`がない
 
-### `~/src/Sepsis.Atlas`を開いたままtaskを始めた
+正常です。task branchをfetchし、同じ`new-worktree` commandでlocal worktreeを再構築します。
 
-作業前ならwindowを閉じ、task worktreeを`code .`で開き直します。すでに変更した場合は、commitまたはstashしてから適切なbranchへ移します。
+### 別PCに未commit変更が見えない
 
-### extensionとCLIを両方起動した
+uncommitted changesは元PCにしかありません。元PCでcommit・pushするか、元PCからpatchを明示的に移します。worktree folderそのものをDropbox同期しません。
 
-両方が同じAgent sessionになるとは限りません。片方を止め、一つのUIに統一します。
+### `new-worktree`がbranch使用中で停止する
 
-### CodexとClaude Codeを同時に開いている
-
-panelが開いているだけなら直ちに問題ではありませんが、両方へ編集taskを同時送信しません。
+同じbranchが別worktreeでcheckoutされています。`git worktree list`で場所を確認し、そのworktreeを使うか、不要なら安全に削除します。
 
 ### review worktreeに最新変更が見えない
 
-base branchの変更が未commitである可能性があります。元task worktreeでcommit後、review worktreeを作り直すか、必要なcommitを取り込みます。
-
-### branchを削除できない
-
-未merge branchに`git branch -d`を実行すると停止します。merge状況を確認し、必要なbranchを誤って削除しないようにします。
+元task branchの変更が未commitである可能性があります。先にcommitしてからreview worktreeを作ります。

@@ -18,14 +18,22 @@ Usage:
 
 MODE may be:
   shared   A switchable task worktree that can be used sequentially by Codex
-           and Claude Code. Recommended when switching after a usage limit.
+           and Claude Code. Recommended for long tasks and cross-PC handoff.
   codex    Agent-specific worktree.
   claude   Agent-specific worktree.
+
+Behavior:
+  - If the task branch does not exist, create it from BASE (default: main).
+  - If the task branch exists locally, attach a new local worktree to it.
+  - If origin has the task branch, create a local tracking branch and resume it.
+
+This means the same command can start a task on one PC and reconstruct its
+worktree on another PC after the branch has been committed and pushed.
 
 Examples:
   new-worktree Sepsis.Atlas shared task-001-qc
   new-worktree Sepsis.Atlas codex task-001-qc
-  new-worktree Sepsis.Atlas claude review-001-qc agent/codex/task-001-qc
+  new-worktree Sepsis.Atlas claude review-001-qc work/task-001-qc
 USAGE
 }
 
@@ -61,13 +69,32 @@ if [[ -n "$(git -C "$REPO" status --porcelain)" ]]; then
   fail "Main working tree has uncommitted changes. Commit or stash them first: $REPO"
 fi
 
-if git -C "$REPO" show-ref --verify --quiet "refs/heads/$BRANCH"; then
-  fail "Branch already exists: $BRANCH"
+# Refresh remote branch information when origin is available. Network failure
+# does not prevent creating a new local task from an already available base.
+if git -C "$REPO" remote get-url origin >/dev/null 2>&1; then
+  if ! git -C "$REPO" fetch origin --prune; then
+    warn "Could not fetch origin. Continuing with the refs currently available locally."
+  fi
 fi
 
-mkdir -p "$WORKTREE_ROOT/$PROJECT"
-git -C "$REPO" rev-parse --verify "$BASE^{commit}" >/dev/null 2>&1 || fail "Base was not found: $BASE"
-git -C "$REPO" worktree add -b "$BRANCH" "$TARGET" "$BASE"
+LOCAL_REF="refs/heads/$BRANCH"
+REMOTE_REF="refs/remotes/origin/$BRANCH"
+ACTION="created"
+
+if git -C "$REPO" show-ref --verify --quiet "$LOCAL_REF"; then
+  if git -C "$REPO" worktree list --porcelain | grep -Fqx "branch $LOCAL_REF"; then
+    fail "Branch is already checked out in another worktree: $BRANCH"
+  fi
+  git -C "$REPO" worktree add "$TARGET" "$BRANCH"
+  ACTION="resumed from local branch"
+elif git -C "$REPO" show-ref --verify --quiet "$REMOTE_REF"; then
+  git -C "$REPO" worktree add --track -b "$BRANCH" "$TARGET" "origin/$BRANCH"
+  ACTION="resumed from origin/$BRANCH"
+else
+  git -C "$REPO" rev-parse --verify "$BASE^{commit}" >/dev/null 2>&1 || fail "Base was not found: $BASE"
+  git -C "$REPO" worktree add -b "$BRANCH" "$TARGET" "$BASE"
+  ACTION="created from $BASE"
+fi
 
 mkdir -p "$TARGET/.local/data"
 printf '%s\n' "$WORKSPACE" > "$TARGET/.local/workspace-name"
@@ -81,7 +108,8 @@ elif [[ -d "$REPO/.local/data" ]]; then
   replace_symlink "$SCRATCH_ROOT/$PROJECT/$WORKSPACE/output" "$TARGET/.local/output"
 fi
 
-info "Worktree created"
+info "Worktree ready"
+echo "  action: $ACTION"
 echo "  branch: $BRANCH"
 echo "  path:   $TARGET"
 echo
@@ -90,8 +118,18 @@ echo "  cd '$TARGET'"
 echo "  code ."
 echo "  Then use the Codex or Claude Code VS Code extension."
 echo "  The integrated terminal can also run: codex or claude"
-if [[ "$MODE" == "shared" ]]; then
-  echo "  Do not give both agents editing tasks in this worktree at the same time."
+echo
+if [[ "$ACTION" == created* ]]; then
+  echo "Before moving to another PC:"
+  echo "  git add <reviewed-files>"
+  echo "  git commit -m 'WIP: describe current state'"
+  echo "  git push -u origin '$BRANCH'"
 else
-  echo "  Intended agent: $MODE"
+  echo "This worktree was reconstructed from an existing task branch."
+  echo "Check handoffs/CURRENT.md, git status, and git branch -vv before continuing."
+fi
+if [[ "$MODE" == "shared" ]]; then
+  echo "Do not give both agents editing tasks in this worktree at the same time."
+else
+  echo "Intended agent: $MODE"
 fi
