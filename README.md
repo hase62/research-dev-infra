@@ -638,50 +638,216 @@ plan承認後、通常modeへ戻して実装します。Claudeの `opusplan` は
 
 # 8. task worktreeとAgent切替
 
-長いtaskは専用worktreeで行います。
+## 8.1 worktreeとは何か
+
+Git worktreeは、**同じGit repositoryを別のfolderへもう1つcheckoutする仕組み**です。
+通常のproject本体は次にあります。
+
+```text
+~/src/Sepsis.Atlas
+```
+
+長いtask用のworktreeを作ると、例えば次が追加されます。
+
+```text
+~/worktrees/Sepsis.Atlas/shared-task-001-inventory
+```
+
+この2つは同じcommit履歴とGit objectを共有しますが、表示しているbranchと作業fileは別です。
+したがって、task側で多数のfileを変更しても、`~/src/Sepsis.Atlas`のmain working treeは汚れません。
+
+```text
+~/src/Sepsis.Atlas
+  branch: main
+  用途: 最新mainの確認、merge後の同期、短いread-only確認
+
+~/worktrees/Sepsis.Atlas/shared-task-001-inventory
+  branch: work/task-001-inventory
+  用途: task-001の設計、実装、test、Agent切替
+```
+
+worktreeはrepository全体を完全複製する仕組みではありません。Git履歴を共有するため、通常のcloneを何個も作るより軽量です。一方、tracked fileはworktreeごとに独立して存在します。
+
+## 8.2 いつworktreeを使うか
+
+| 作業 | 推奨場所 |
+|---|---|
+| fileを読むだけ、短い確認 | `~/src/<Project>` |
+| 数fileだけの明確な小修正 | `~/src/<Project>`でもよい |
+| 数時間以上の実装、解析pipeline変更 | shared task worktree |
+| CodexとClaude Codeを途中で切り替えるtask | shared task worktree |
+| 2つのtaskを並行して進める | taskごとに別worktree |
+| 実装とは分離した独立review | review専用worktree |
+
+すべての操作にworktreeを使う必要はありません。**長くなる、変更範囲が広い、別Agentへ引き継ぐ可能性がある**場合に使います。
+
+## 8.3 task worktreeを作る
+
+作成前にmain checkoutを最新かつcleanにします。`new-worktree`は既定でlocalの`main`をbaseにするため、この更新を先に行います。
+
+```bash
+cd ~/src/Sepsis.Atlas
+
+git switch main
+git pull --rebase
+git status
+```
+
+`working tree clean`を確認してから作成します。
 
 ```bash
 new-worktree Sepsis.Atlas shared task-001-inventory
+```
+
+このcommandは次を作成します。
+
+```text
+branch: work/task-001-inventory
+path:   ~/worktrees/Sepsis.Atlas/shared-task-001-inventory
+```
+
+さらに、そのworktree専用の次のlinkを作成します。
+
+```text
+.local/data
+.local/scratch
+.local/output
+```
+
+## 8.4 VS Codeでworktreeを開く
+
+このworkflowでは、**VS Codeを主要画面として使う方法を標準**にします。
+
+```bash
 cd ~/worktrees/Sepsis.Atlas/shared-task-001-inventory
 code .
 ```
 
-Codexで開始：
+WSL2では、左下に`WSL: Ubuntu`などが表示されていることを確認します。macOSではlocal folderとして直接開きます。
+
+重要なのは、VS Codeで`~/src/Sepsis.Atlas`ではなく、今作ったworktree folderを開くことです。CodexまたはClaude Code extensionは、現在開いているfolder、active file、選択範囲、Git差分をtask contextとして使用します。
+
+推奨運用：
+
+- 1つのVS Code windowには1つのproject rootまたは1つのworktreeだけを開く。
+- main checkoutとtask worktreeを同じmulti-root workspaceへ混在させない。
+- window titleまたは左下のGit branch表示で`work/task-001-inventory`を確認する。
+- Python/R環境、Git、test commandはVS Codeの統合terminalから実行する。
+
+## 8.5 VS Code extensionとCLIのどちらを使うか
+
+CodexとClaude Codeは、どちらもVS Code extensionを主要UIとして使用できます。**extensionを使う場合、統合terminalで`codex`または`claude`を起動する必要はありません。**
+
+### Codex
+
+VS CodeのCodex icon、またはCommand Paletteの`Codex: Open Codex Sidebar`から開始します。開いているfileや選択範囲をcontextに追加し、提案されたdiffをVS Code内で確認します。
+
+Codex IDE extensionとCodex CLIは同じ`~/.codex/config.toml`を使用するため、このinfraで設定した`gpt-5.6 / xhigh`が両方へ適用されます。
+
+terminal UIを使いたい場合だけ、統合terminalで次を実行します。
 
 ```bash
 codex
 ```
 
-利用上限や作業分担でClaudeへ切り替える場合：
+### Claude Code
 
-1. Codexを停止する。
-2. `handoffs/CURRENT.md`を更新する。
-3. `git status`と`git diff`を確認する。
-4. 同じworktreeでClaude Codeを起動する。
+VS CodeのClaude Code iconからsessionを開始します。Plan Mode、inline diff、file参照をVS Code内で使用できます。
+
+Claude Code extensionとstandalone CLIは`~/.claude/settings.json`を共有するため、このinfraで設定した`stable / opus / xhigh`が両方へ適用されます。
+
+terminal UIを使いたい場合だけ、統合terminalで次を実行します。
 
 ```bash
 claude
 ```
 
-同じworktreeで両Agentを同時実行しません。
+このinfraはextensionとCLIの両方を導入しますが、日常作業では次を推奨します。
 
-独立review用worktree例：
-
-```bash
-new-worktree \
-  Sepsis.Atlas \
-  claude \
-  review-001 \
-  work/task-001-inventory
+```text
+コード閲覧・指示・diff確認: VS Code extension
+Git・conda・R/Python・test: VS Code integrated terminal
+特殊なCLI commandが必要: codex または claude CLI
 ```
 
-worktree削除：
+## 8.6 CodexからClaude Codeへ切り替える
+
+両extensionをインストールしておくこと自体は問題ありません。ただし、**同じworktreeへ同時に編集指示を出してはいけません。**
+
+切替手順：
+
+1. Codexのtaskを停止し、実行中commandがないことを確認する。
+2. VS CodeのSource Controlまたはterminalで変更を確認する。
+3. `handoffs/CURRENT.md`へ現在地を短く記録する。
+4. 可能なら意味のある単位でcheckpoint commitを作る。
+5. Claude Code extensionを同じVS Code windowで開始する。
+6. ClaudeへhandoffとGit差分を先に読ませる。
+
+```bash
+git status
+git diff --stat
+git diff
+```
+
+handoffには最低限、次を記載します。
+
+```text
+Task
+Current state
+Completed
+Next actions
+Validation performed
+Important files and caveats
+```
+
+Agent切替時の最初の指示例：
+
+```text
+PROJECT.md、CLAUDE.md、handoffs/CURRENT.mdを読み、git statusとgit diffを確認してください。
+前Agentの実装を無条件に信頼せず、現在のscientific assumptionsと未完了点を確認してから続行してください。
+```
+
+CodexとClaude Codeのchat履歴は自動では引き継がれません。引継ぎの正本は、repository内のinstruction file、`handoffs/CURRENT.md`、commit、`git diff`です。
+
+変更がまだ不完全でcommitできない場合は、未commitのまま切り替えても構いません。同じworktreeなので次のAgentから変更は見えます。ただし、handoffに「未commitである理由」と「壊れている可能性がある箇所」を明記します。
+
+## 8.7 taskを完了する
+
+実装、test、結果確認が終わったら、task branchへcommitしてpushします。
+
+```bash
+cd ~/worktrees/Sepsis.Atlas/shared-task-001-inventory
+
+git status
+# project固有のtestを実行
+git add -A
+git commit -m "Complete task 001 inventory"
+git push -u origin work/task-001-inventory
+```
+
+必要ならPull Requestを作成します。
+
+```bash
+gh pr create \
+  --base main \
+  --head work/task-001-inventory
+```
+
+mainへmergeした後、main checkoutを更新します。
+
+```bash
+cd ~/src/Sepsis.Atlas
+git switch main
+git pull --rebase
+```
+
+VS Codeのtask windowを閉じ、worktreeを削除します。
 
 ```bash
 remove-worktree Sepsis.Atlas shared task-001-inventory
 ```
 
-branchも削除する場合：
+branchもmerge済みで削除する場合：
 
 ```bash
 remove-worktree \
@@ -691,7 +857,30 @@ remove-worktree \
   --delete-branch
 ```
 
-詳細は [`docs/WORKTREES.md`](docs/WORKTREES.md) を参照してください。
+未commit変更があるworktreeは削除されません。`.local/output`に残すべき成果物がある場合も、削除前に保存先を確認します。
+
+## 8.8 独立review用worktree
+
+実装とは別のbranchとfolderでreviewしたい場合だけ、review worktreeを作ります。review対象の未commit変更はbaseに含まれないため、先にtask branchへcommitします。
+
+```bash
+new-worktree \
+  Sepsis.Atlas \
+  claude \
+  review-001 \
+  work/task-001-inventory
+```
+
+作成後は別のVS Code windowで開きます。
+
+```bash
+cd ~/worktrees/Sepsis.Atlas/claude-review-001
+code .
+```
+
+単にCodexからClaudeへ作業を続けてほしいだけなら、review worktreeは不要です。同じshared task worktreeで順番に切り替えます。
+
+詳細は[`docs/WORKTREES.md`](docs/WORKTREES.md)を参照してください。
 
 ---
 

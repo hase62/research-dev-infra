@@ -22,7 +22,7 @@ cd ~/src/__PROJECT_NAME__
 code .
 ```
 
-On WSL2, confirm that the lower-left corner shows a WSL connection. On macOS, open the local repository directly. Use the integrated terminal to run `codex` or `claude`. When one service reaches its usage limit, stop it and start the other in the same worktree. Read `handoffs/CURRENT.md`, `git status`, and `git diff` before continuing.
+On WSL2, confirm that the lower-left corner shows a WSL connection. On macOS, open the local repository directly. Use the Codex or Claude Code VS Code extension as the primary interface; the integrated terminal is for Git, environments, tests, or the optional `codex` / `claude` terminal UI. When one service reaches its usage limit, stop its task before starting the other in the same worktree. Read `handoffs/CURRENT.md`, `git status`, and `git diff` before continuing.
 
 ## Edit with Emacs
 

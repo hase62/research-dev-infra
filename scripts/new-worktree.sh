@@ -88,10 +88,10 @@ echo
 echo "Start with:"
 echo "  cd '$TARGET'"
 echo "  code ."
+echo "  Then use the Codex or Claude Code VS Code extension."
+echo "  The integrated terminal can also run: codex or claude"
 if [[ "$MODE" == "shared" ]]; then
-  echo "  then start either: codex"
-  echo "  or:                claude"
-  echo "  Do not run both against this worktree at the same time."
+  echo "  Do not give both agents editing tasks in this worktree at the same time."
 else
-  echo "  $MODE"
+  echo "  Intended agent: $MODE"
 fi
