@@ -81,5 +81,5 @@ setup-agent-defaults
 setup-emacs
 ```
 
-The standard agent defaults are Codex GPT-5.6 with xhigh reasoning and Claude
-Code `opus` with xhigh effort. `setup-emacs` installs terminal Emacs for WSL2.
+The standard agent defaults are Codex `gpt-5.6` with xhigh reasoning and Claude
+Code `claude-opus-5` with xhigh effort. `setup-emacs` installs terminal Emacs for WSL2.

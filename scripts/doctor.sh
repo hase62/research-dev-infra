@@ -39,6 +39,60 @@ for command_name in gh conda mamba codex claude code emacs; do
   fi
 done
 
+if command -v python3 >/dev/null 2>&1; then
+  if [[ -f "$HOME/.codex/config.toml" ]]; then
+    if python3 - "$HOME/.codex/config.toml" <<'PYCODEX'
+import sys
+import tomllib
+from pathlib import Path
+
+path = Path(sys.argv[1])
+with path.open("rb") as handle:
+    data = tomllib.load(handle)
+expected = {
+    "model": "gpt-5.6",
+    "model_reasoning_effort": "xhigh",
+    "plan_mode_reasoning_effort": "xhigh",
+}
+raise SystemExit(0 if all(data.get(k) == v for k, v in expected.items()) else 1)
+PYCODEX
+    then
+      ok "Codex defaults: gpt-5.6 / xhigh; Plan Mode xhigh"
+    else
+      warn "Codex defaults differ from the research standard; run setup-agent-defaults"
+    fi
+  else
+    warn "$HOME/.codex/config.toml is missing; run setup-agent-defaults"
+  fi
+
+  if [[ -f "$HOME/.claude/settings.json" ]]; then
+    if python3 - "$HOME/.claude/settings.json" <<'PYCLAUDE'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+data = json.loads(path.read_text(encoding="utf-8"))
+expected = {"model": "claude-opus-5", "effortLevel": "xhigh"}
+raise SystemExit(0 if all(data.get(k) == v for k, v in expected.items()) else 1)
+PYCLAUDE
+    then
+      ok "Claude Code defaults: claude-opus-5 / xhigh"
+    else
+      warn "Claude Code defaults differ from the research standard; run setup-agent-defaults"
+    fi
+  else
+    warn "$HOME/.claude/settings.json is missing; run setup-agent-defaults"
+  fi
+fi
+
+if [[ -n "${ANTHROPIC_MODEL:-}" ]]; then
+  warn "ANTHROPIC_MODEL overrides the Claude Code model default"
+fi
+if [[ -n "${CLAUDE_CODE_EFFORT_LEVEL:-}" ]]; then
+  warn "CLAUDE_CODE_EFFORT_LEVEL overrides the Claude Code effort default"
+fi
+
 if command -v code >/dev/null 2>&1; then
   extensions="$(code --list-extensions 2>/dev/null || true)"
   for extension in ms-vscode-remote.remote-wsl openai.chatgpt anthropic.claude-code; do

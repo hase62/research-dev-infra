@@ -537,14 +537,22 @@ claude
 
 ### 研究計算用の標準modelとeffortを設定する
 
-このinfraの標準は次です。
+このinfraでは、新しいsessionの標準を次に固定します。
 
 ```text
-Codex       GPT-5.6   xhigh
-Claude Code opus      xhigh
+Codex       gpt-5.6         xhigh
+Codex Plan  gpt-5.6         xhigh
+Claude Code claude-opus-5   xhigh
 ```
 
-設定します。
+Claude Codeを先に最新版へ更新します。`claude-opus-5`にはClaude Code 2.1.219以降が必要です。
+
+```bash
+claude update
+claude --version
+```
+
+標準設定を反映します。
 
 ```bash
 setup-agent-defaults
@@ -556,7 +564,7 @@ setup-agent-defaults
 AGENTS
 ```
 
-このcommandは次を設定し、既存設定はtimestamp付きでbackupします。
+`setup-agent-defaults`は既存設定をtimestamp付きでbackupしたうえで、次を設定・検証します。
 
 Codex `~/.codex/config.toml`：
 
@@ -570,19 +578,32 @@ Claude Code `~/.claude/settings.json`：
 
 ```json
 {
-  "model": "opus",
+  "model": "claude-opus-5",
   "effortLevel": "xhigh"
 }
 ```
 
-Claude Codeは最新版へ更新します。
+設定後は、既存sessionを再開せず、新しいsessionを起動して確認します。
+
+Codex：
 
 ```bash
-claude update
-claude --version
+codex
 ```
 
-Claude Code v2.1.219以降では、Anthropic APIの `opus` aliasはOpus 5へ解決されます。起動後に確認します。
+Codex内：
+
+```text
+/status
+```
+
+Claude Code：
+
+```bash
+claude
+```
+
+Claude Code内：
 
 ```text
 /status
@@ -590,19 +611,24 @@ Claude Code v2.1.219以降では、Anthropic APIの `opus` aliasはOpus 5へ解�
 /effort
 ```
 
-pickerが古いOpusを表示する場合でも、最新版へ更新後に直接指定できます。
+Claude Codeの`--resume`または`--continue`は、保存時に使用していたmodelを維持します。最初の確認では使用しません。
+
+一時的に`max`を使う場合は、persistent defaultを変更せずsession単位で指定します。
 
 ```bash
-claude --model claude-opus-5 --effort xhigh
+claude --model claude-opus-5 --effort max
 ```
 
-`max`はpersistent defaultにせず、特に難しいtaskだけsession単位で使用します。
+Codexはsession中の`/model`から一時的にeffortを変更します。
+
+環境変数`ANTHROPIC_MODEL`または`CLAUDE_CODE_EFFORT_LEVEL`が設定されている場合、Claude Codeのuser settingsより優先されます。確認します。
 
 ```bash
-claude --model opus --effort max
+[[ -n "${ANTHROPIC_MODEL:-}" ]] && echo "ANTHROPIC_MODEL is set"
+[[ -n "${CLAUDE_CODE_EFFORT_LEVEL:-}" ]] && echo "CLAUDE_CODE_EFFORT_LEVEL is set"
 ```
 
-Codexではsession中の `/model` から一時的にeffortを変更できます。
+通常は両方とも何も表示されない状態にします。
 
 ### 古いscriptで `Start Codex now? [y/N]` に `y` と答えた場合
 
@@ -1834,7 +1860,7 @@ codex
 | `research-doctor` | WSL2、GitHub、Dropbox、Agent環境を点検 |
 | `install-coding-agents` | CodexとClaude Codeを公式installerで導入 |
 | `setup-vscode` | VS Codeの公式WSL、Codex、Claude Code、解析extensionを導入 |
-| `setup-agent-defaults` | Codex GPT-5.6/xhighとClaude Opus/xhighを標準設定 |
+| `setup-agent-defaults` | Codex gpt-5.6/xhighとClaude Code claude-opus-5/xhighを標準設定 |
 | `setup-emacs` | WSL2へterminal Emacsを導入 |
 | `install-miniforge` | WSL2内へMiniforgeを導入 |
 | `analysis-smoke-test` | projectのGit、data link、scratch、Python/Rを確認 |
