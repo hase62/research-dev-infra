@@ -1,85 +1,134 @@
-# 新しいPCのセットアップ
+# Machine setup
 
-詳細な初回手順は [WSL2導入後から最初の解析まで](FROM_WSL_TO_FIRST_ANALYSIS.md) を先に参照してください。
+`research-dev-infra`はUbuntu on WSL2とmacOSを同じ論理構成で扱います。
+
+詳細手順：
+
+- WSL2: [WSL2導入後から最初の解析まで](FROM_WSL_TO_FIRST_ANALYSIS.md)
+- macOS: [Macセットアップ](MAC_SETUP.md)
 
 ## 前提
 
-- Windows 11とWSL2 Ubuntu
-- Windows側にDropbox desktop applicationが導入済み
-- Dropbox内に以下が存在する
-  - `Research`
-  - `ForShareLargeData`
-- WSL2内にGitとGitHub CLIが導入済み（未導入なら `scripts/bootstrap-ubuntu.sh` を使用）
+共通：
 
-## 手順
+- GitHub account
+- Dropbox account
+- Dropbox root直下に `Research` と `ForShareLargeData`
+- Git repositoryはDropbox外の `~/src/`
+
+WSL2：
+
+- Windows 11
+- WSL2 Ubuntu
+- Windows版DropboxとVisual Studio Code
+
+macOS：
+
+- macOS 13以降を推奨
+- Apple Command Line Tools
+- Homebrew
+- Mac版DropboxとVisual Studio Code
+
+## 初期bootstrap
+
+WSL2：
 
 ```bash
-mkdir -p ~/src
-cd ~/src
-git clone https://github.com/<YOUR_ACCOUNT>/research-dev-infra.git
-cd research-dev-infra
-bash scripts/setup-machine.sh
-source ~/.bashrc
-research-doctor
+bash scripts/bootstrap-ubuntu.sh \
+  --git-name "Takanori Hasegawa" \
+  --git-email "GitHubに登録しているメールアドレス"
 ```
 
-`setup-machine.sh`は次だけを行います。
+macOS：
+
+```bash
+xcode-select --install
+
+bash scripts/bootstrap-macos.sh \
+  --git-name "Takanori Hasegawa" \
+  --git-email "GitHubに登録しているメールアドレス"
+```
+
+VS CodeとDropboxもHomebrewから導入する場合：
+
+```bash
+bash scripts/bootstrap-macos.sh --desktop-apps
+```
+
+## 共通machine setup
+
+```bash
+bash scripts/setup-machine.sh
+```
+
+WSL2では通常、Windows userと `C:\Users\<user>\Dropbox` を自動検出します。
+
+macOSでは通常、`~/Library/CloudStorage/Dropbox*` を探索し、`Research`と`ForShareLargeData`の両方を持つrootを自動検出します。
+
+自動検出できない場合：
+
+```bash
+bash scripts/setup-machine.sh --dropbox-home "/actual/path/to/Dropbox"
+```
+
+Shell設定を再読込します。
+
+```bash
+# WSL2
+source ~/.bashrc
+
+# macOS
+source ~/.zshrc
+```
+
+実行内容：
 
 1. `~/src`、`~/worktrees`、`~/scratch`、`~/data-roots`を作成
-2. Dropboxの `Research` と `ForShareLargeData` へのsymlinkを作成
-3. `~/.research_env`を作成
-4. `~/.bashrc`から `~/.research_env`を読み込む設定を追加
-5. 共通コマンドを `~/.local/bin` に登録
+2. Dropboxの2ルートを `~/data-roots/` へsymlink
+3. `~/.research_env`を生成
+4. WSL2では `~/.bashrc`、macOSでは `~/.zshrc`から読み込む設定を追加
+5. `~/.local/bin`へ共通commandを登録
 
-PC全体で共通の `D:\ResearchLocal` のような大容量ルートは作りません。ローカルSSDや外付けディスクが必要な研究だけ、各projectの `scripts/setup-local-links.sh` で任意の実パスを直接linkします。
+## project固有のローカルデータ
 
-例：
+machine全体の `LOCAL_ROOT` は定義しません。必要なprojectだけ `scripts/setup-local-links.sh` に追加します。
 
 ```bash
+# Dropbox共通論理root
+link_data "$RESEARCH_ROOT/Papers/ProteomicAging" papers
+link_data "$LARGE_ROOT/Proteomics/PublicData" public_data
+
+# WSL2固有例
 link_data "/mnt/e/ProteomicAging/raw" raw
 use_output_dir "/mnt/e/ProteomicAging/results/$WORKSPACE_NAME"
+
+# macOS固有例
+link_data "/Volumes/ExternalSSD/ProteomicAging/raw" raw
+use_output_dir "/Volumes/ExternalSSD/ProteomicAging/results/$WORKSPACE_NAME"
 ```
 
-## CodexとClaude Code
+## Agentとeditor
 
 ```bash
 install-coding-agents
-```
-
-導入後に各コマンドを起動し、各PCでログインします。
-
-```bash
-codex
-claude
-```
-
-認証ディレクトリをDropboxやGitHubで同期しないでください。
-
-## Miniforge
-
-```bash
-install-miniforge
-source ~/.bashrc
-```
-
-研究ごとに独立したConda/Mamba環境を作り、base環境へ解析packageを追加しないでください。
-
-## 最初の解析確認
-
-projectを作成してdata linkと解析環境を準備した後：
-
-```bash
-analysis-smoke-test <ProjectName>
-```
-
-## Optional editor and research-grade agent defaults
-
-After `setup-machine.sh` has registered commands:
-
-```bash
 setup-agent-defaults
+setup-vscode
 setup-emacs
 ```
 
-The standard agent defaults are Codex `gpt-5.6` with xhigh reasoning and Claude
-Code `claude-opus-5` with xhigh effort. `setup-emacs` installs terminal Emacs for WSL2.
+標準Agent設定：
+
+```text
+Codex       gpt-5.6 / xhigh
+Codex Plan  gpt-5.6 / xhigh
+Claude Code stable channel / opus / xhigh
+```
+
+## 診断
+
+```bash
+research-doctor
+research-doctor <Project>
+```
+
+`Failures: 0`なら共通基盤は利用可能です。未導入の任意ツールはwarningとして表示されます。

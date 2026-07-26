@@ -8,7 +8,7 @@ usage() {
 Usage:
   install-agents.sh [--yes]
 
-Installs Codex CLI and Claude Code using their official Linux installers.
+Installs Codex CLI and Claude Code using their official macOS/Linux installers.
 USAGE
 }
 

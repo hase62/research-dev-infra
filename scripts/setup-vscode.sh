@@ -9,8 +9,10 @@ usage() {
 Usage:
   setup-vscode.sh [--yes]
 
-Checks the Windows Visual Studio Code command from WSL and installs the
-recommended official extensions for the research workflow:
+Checks Visual Studio Code and installs the recommended official extensions for
+this research workflow.
+
+WSL2:
   - WSL
   - Codex
   - Claude Code
@@ -18,15 +20,27 @@ recommended official extensions for the research workflow:
   - Jupyter
   - R
 
-Visual Studio Code itself is a Windows application and is not installed by
-this script. The script requires VS Code 1.98.0 or newer because the current
-Claude Code extension requires at least that version.
+macOS:
+  - Codex
+  - Claude Code
+  - Python
+  - Jupyter
+  - R
+
+The script requires VS Code 1.98.0 or newer because current AI and analysis
+extensions may reject older versions.
 USAGE
 }
 
 version_ge() {
-  # Return success when $1 >= $2 using version-aware sort.
-  [[ "$(printf '%s\n%s\n' "$2" "$1" | sort -V | head -n 1)" == "$2" ]]
+  python3 - "$1" "$2" <<'PY'
+import sys
+
+def parts(value):
+    return tuple(int(x) for x in value.split("."))
+
+raise SystemExit(0 if parts(sys.argv[1]) >= parts(sys.argv[2]) else 1)
+PY
 }
 
 while [[ $# -gt 0 ]]; do
@@ -47,19 +61,58 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+OS="$(uname -s)"
+case "$OS" in
+  Linux)
+    if ! grep -qi microsoft /proc/version 2>/dev/null; then
+      echo "ERROR: Linux setup is supported only under WSL2." >&2
+      exit 1
+    fi
+    PLATFORM="wsl"
+    ;;
+  Darwin)
+    PLATFORM="macos"
+    ;;
+  *)
+    echo "ERROR: Unsupported operating system: $OS" >&2
+    exit 1
+    ;;
+esac
+
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "ERROR: python3 is required for version checks." >&2
+  exit 1
+fi
+
 if ! command -v code >/dev/null 2>&1; then
-  cat <<'MISSING'
+  if [[ "$PLATFORM" == "wsl" ]]; then
+    cat <<'MISSING_WSL'
 Visual Studio Code's `code` command is not available in this WSL shell.
 
-Install Visual Studio Code on Windows, not inside Ubuntu.
-From Windows PowerShell:
+Install Visual Studio Code on Windows, not inside Ubuntu. From Windows
+PowerShell:
 
   winget install --id Microsoft.VisualStudioCode -e
 
 Then close and reopen Ubuntu. If `code` is still unavailable, open VS Code on
 Windows, install the Microsoft "WSL" extension, and run "WSL: Connect to WSL"
 from the Command Palette once.
-MISSING
+MISSING_WSL
+  else
+    cat <<'MISSING_MAC'
+Visual Studio Code's `code` command is not available on this Mac.
+
+Install it with Homebrew:
+
+  brew install --cask visual-studio-code
+
+Then open Visual Studio Code and run from the Command Palette:
+
+  Shell Command: Install 'code' command in PATH
+
+Open a new Terminal window and rerun setup-vscode.
+MISSING_MAC
+  fi
   exit 1
 fi
 
@@ -70,46 +123,48 @@ if [[ ! "$VSCODE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 fi
 
 if ! version_ge "$VSCODE_VERSION" "$MIN_VSCODE_VERSION"; then
-  cat <<EOF_OLD
-ERROR: Visual Studio Code $VSCODE_VERSION is too old.
-
-This workflow requires VS Code $MIN_VSCODE_VERSION or newer because current
-Codex, Claude Code, and analysis extensions may reject older versions.
-
+  echo "ERROR: Visual Studio Code $VSCODE_VERSION is too old." >&2
+  echo "This workflow requires VS Code $MIN_VSCODE_VERSION or newer." >&2
+  echo >&2
+  if [[ "$PLATFORM" == "wsl" ]]; then
+    cat >&2 <<'OLD_WSL'
 Close all VS Code windows, then update from Windows PowerShell:
 
   winget upgrade --id Microsoft.VisualStudioCode -e
 
-If winget does not find an upgrade, run:
-
-  winget install --id Microsoft.VisualStudioCode -e
-
 Then restart WSL from Windows PowerShell:
 
   wsl --shutdown
+OLD_WSL
+  else
+    cat >&2 <<'OLD_MAC'
+Update Visual Studio Code with:
 
-Open Ubuntu again and verify:
+  brew upgrade --cask visual-studio-code
 
-  code --version
-
-After the version is at least $MIN_VSCODE_VERSION, rerun:
-
-  setup-vscode
-EOF_OLD
+If it was not installed through Homebrew, use Code -> Check for Updates in VS
+Code or replace it with the current official application.
+OLD_MAC
+  fi
+  echo >&2
+  echo "Verify with: code --version" >&2
+  echo "Then rerun: setup-vscode" >&2
   exit 1
 fi
 
 EXTENSIONS=(
-  "ms-vscode-remote.remote-wsl"
   "OpenAI.chatgpt"
   "anthropic.claude-code"
   "ms-python.python"
   "ms-toolsai.jupyter"
   "REditorSupport.r"
 )
+if [[ "$PLATFORM" == "wsl" ]]; then
+  EXTENSIONS=("ms-vscode-remote.remote-wsl" "${EXTENSIONS[@]}")
+fi
 
 cat <<NOTICE
-Detected Visual Studio Code $VSCODE_VERSION.
+Detected Visual Studio Code $VSCODE_VERSION on $PLATFORM.
 This installs or updates the recommended VS Code extensions for this workflow.
 Codex and Claude Code remain separate services with separate authentication and
 usage limits. Installing both extensions does not merge their sessions.
@@ -126,7 +181,7 @@ fi
 FAILED_EXTENSIONS=()
 for extension in "${EXTENSIONS[@]}"; do
   echo "==> Installing VS Code extension: $extension"
-  log_file="$(mktemp)"
+  log_file="$(mktemp "${TMPDIR:-/tmp}/vscode-extension.XXXXXX")"
   if code --install-extension "$extension" --force >"$log_file" 2>&1; then
     cat "$log_file"
   else
@@ -145,15 +200,12 @@ if (( ${#FAILED_EXTENSIONS[@]} > 0 )); then
   echo "Failed extensions:" >&2
   printf '  - %s\n' "${FAILED_EXTENSIONS[@]}" >&2
   echo >&2
-  echo "Check that Windows VS Code is current, then run:" >&2
-  echo "  wsl --shutdown" >&2
-  echo "  code --version" >&2
-  echo "  setup-vscode" >&2
+  echo "Update VS Code, confirm 'code --version', and rerun setup-vscode." >&2
   exit 1
 fi
 
 echo
 echo "VS Code setup completed successfully."
-echo "Open a project from WSL with:"
+echo "Open a project with:"
 echo "  cd ~/src/<Project>"
 echo "  code ."

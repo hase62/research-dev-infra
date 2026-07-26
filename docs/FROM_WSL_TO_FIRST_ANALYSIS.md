@@ -2,6 +2,8 @@
 
 この文書は、WSL2とUbuntuをインストールした直後から、GitHub、Dropbox、Miniforge、Codex、Claude Codeを準備し、最初の研究repositoryで解析を実行するまでの一本道です。
 
+Macを設定する場合は [Macセットアップ](MAC_SETUP.md) を参照してください。
+
 構成は次を前提とします。
 
 - コードはWSL2内の `~/src/<Project>` に置く

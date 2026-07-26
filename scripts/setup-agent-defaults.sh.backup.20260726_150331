@@ -2,21 +2,27 @@
 set -euo pipefail
 
 YES=false
+CLAUDE_MIN_VERSION="2.1.219"
 
 usage() {
   cat <<'USAGE'
 Usage:
   setup-agent-defaults.sh [--yes]
 
-Configures persistent default interactive coding models for research work:
+Configures the persistent default interactive coding models for research work:
   Codex:       gpt-5.6 with xhigh reasoning
   Codex Plan:  gpt-5.6 with xhigh reasoning
-  Claude Code: stable update channel, opus alias, xhigh effort
+  Claude Code: claude-opus-5 with xhigh effort
 
-The Claude `opus` alias uses the newest Opus available on the stable Claude Code
-channel. The script preserves unrelated settings and creates timestamped
-backups.
+The script preserves unrelated settings and creates timestamped backups.
+Claude Code 2.1.219 or later is required for claude-opus-5.
 USAGE
+}
+
+version_ge() {
+  local current="$1"
+  local required="$2"
+  [[ "$(printf '%s\n%s\n' "$required" "$current" | sort -V | head -n 1)" == "$required" ]]
 }
 
 while [[ $# -gt 0 ]]; do
@@ -46,8 +52,7 @@ This sets the persistent default agent configuration for research computing:
     plan_mode_reasoning_effort = xhigh
 
   Claude Code
-    autoUpdatesChannel = stable
-    model = opus
+    model = claude-opus-5
     effortLevel = xhigh
 
 Use max only for a specific difficult session rather than as the persistent default.
@@ -61,10 +66,31 @@ if [[ "$YES" != true ]]; then
   }
 fi
 
-command -v python3 >/dev/null 2>&1 || {
-  echo "ERROR: python3 is required." >&2
-  exit 1
-}
+if command -v claude >/dev/null 2>&1; then
+  claude_version="$(claude --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n 1 || true)"
+  if [[ -n "$claude_version" ]] && ! version_ge "$claude_version" "$CLAUDE_MIN_VERSION"; then
+    echo "Claude Code $claude_version is older than the required $CLAUDE_MIN_VERSION."
+    if [[ "$YES" == true ]]; then
+      update_answer="y"
+    else
+      read -r -p "Run 'claude update' now? [Y/n] " update_answer
+      update_answer="${update_answer:-y}"
+    fi
+    if [[ "$update_answer" =~ ^[Yy]$ ]]; then
+      claude update
+      hash -r
+      claude_version="$(claude --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n 1 || true)"
+    fi
+    if [[ -z "$claude_version" ]] || ! version_ge "$claude_version" "$CLAUDE_MIN_VERSION"; then
+      echo "ERROR: Claude Code $CLAUDE_MIN_VERSION or later is required." >&2
+      echo "Run: claude update" >&2
+      exit 1
+    fi
+  fi
+else
+  echo "WARNING: Claude Code is not installed. The settings will be written now," >&2
+  echo "         but install Claude Code 2.1.219 or later before using claude-opus-5." >&2
+fi
 
 stamp="$(date +%Y%m%d_%H%M%S)"
 
@@ -128,8 +154,7 @@ else:
 if not isinstance(data, dict):
     raise SystemExit(f"ERROR: expected a JSON object in {path}")
 
-data["autoUpdatesChannel"] = "stable"
-data["model"] = "opus"
+data["model"] = "claude-opus-5"
 data["effortLevel"] = "xhigh"
 path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 PY
@@ -156,11 +181,7 @@ for key, expected in expected_codex.items():
     if actual != expected:
         raise SystemExit(f"ERROR: {codex_path}: {key}={actual!r}, expected {expected!r}")
 
-expected_claude = {
-    "autoUpdatesChannel": "stable",
-    "model": "opus",
-    "effortLevel": "xhigh",
-}
+expected_claude = {"model": "claude-opus-5", "effortLevel": "xhigh"}
 for key, expected in expected_claude.items():
     actual = claude.get(key)
     if actual != expected:
@@ -178,8 +199,7 @@ Codex config:
 
 Claude Code settings:
   $claude_settings
-  autoUpdatesChannel = stable
-  model = opus
+  model = claude-opus-5
   effortLevel = xhigh
 
 Start new sessions and verify:

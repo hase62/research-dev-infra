@@ -9,8 +9,9 @@ usage() {
 Usage:
   install-miniforge.sh [--prefix PATH] [--yes]
 
-Installs the latest Miniforge for the current Linux architecture, initializes
-conda for Bash, and disables automatic activation of the base environment.
+Installs the latest Miniforge for the current Linux or macOS architecture,
+initializes the default shell, and disables automatic activation of the base
+environment.
 USAGE
 }
 
@@ -42,21 +43,38 @@ if [[ -e "$PREFIX" ]]; then
   exit 1
 fi
 
-case "$(uname -m)" in
-  x86_64|amd64)
+OS="$(uname -s)"
+ARCH="$(uname -m)"
+
+case "$OS:$ARCH" in
+  Linux:x86_64|Linux:amd64)
     INSTALLER="Miniforge3-Linux-x86_64.sh"
+    SHELL_NAME="bash"
+    RC_FILE="$HOME/.bashrc"
     ;;
-  aarch64|arm64)
+  Linux:aarch64|Linux:arm64)
     INSTALLER="Miniforge3-Linux-aarch64.sh"
+    SHELL_NAME="bash"
+    RC_FILE="$HOME/.bashrc"
+    ;;
+  Darwin:arm64)
+    INSTALLER="Miniforge3-MacOSX-arm64.sh"
+    SHELL_NAME="zsh"
+    RC_FILE="$HOME/.zshrc"
+    ;;
+  Darwin:x86_64)
+    INSTALLER="Miniforge3-MacOSX-x86_64.sh"
+    SHELL_NAME="zsh"
+    RC_FILE="$HOME/.zshrc"
     ;;
   *)
-    echo "ERROR: Unsupported architecture: $(uname -m)" >&2
+    echo "ERROR: Unsupported platform: $OS $ARCH" >&2
     exit 1
     ;;
 esac
 
 URL="https://github.com/conda-forge/miniforge/releases/latest/download/$INSTALLER"
-TMP_INSTALLER="$(mktemp --suffix=.sh)"
+TMP_INSTALLER="$(mktemp "${TMPDIR:-/tmp}/miniforge.XXXXXX.sh")"
 trap 'rm -f "$TMP_INSTALLER"' EXIT
 
 cat <<NOTICE
@@ -77,7 +95,7 @@ fi
 curl -fL "$URL" -o "$TMP_INSTALLER"
 bash "$TMP_INSTALLER" -b -p "$PREFIX"
 
-"$PREFIX/bin/conda" init bash
+"$PREFIX/bin/conda" init "$SHELL_NAME"
 "$PREFIX/bin/conda" config --set auto_activate_base false
 
 cat <<DONE
@@ -85,7 +103,7 @@ cat <<DONE
 Miniforge installed.
 
 Open a new shell or run:
-  source ~/.bashrc
+  source $RC_FILE
 
 Then verify:
   conda --version

@@ -20,11 +20,15 @@ Usage:
   setup-machine.sh [options]
 
 Options:
-  --windows-user NAME    Windows account name
-  --dropbox-home PATH    Dropbox root as seen from WSL
+  --windows-user NAME    Windows account name (WSL only)
+  --dropbox-home PATH    Dropbox root as seen from the current OS
   -h, --help             Show this help
 
-This script configures only machine-wide shared roots and commands:
+Supported environments:
+  - Ubuntu under WSL2
+  - macOS
+
+The script configures only machine-wide shared roots and commands:
   - Dropbox/Research
   - Dropbox/ForShareLargeData
   - ~/src, ~/worktrees, ~/scratch
@@ -57,13 +61,68 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "$WINDOWS_USER" ]] && command -v cmd.exe >/dev/null 2>&1; then
-  WINDOWS_USER="$(cmd.exe /C 'echo %USERNAME%' 2>/dev/null | tr -d '\r' | tail -n 1)"
-fi
+PLATFORM="$(platform_name)"
+[[ "$PLATFORM" != "unsupported" ]] || fail "Unsupported operating system: $(uname -s)"
+
+find_macos_dropbox_home() {
+  local candidates=()
+  local candidate
+  local existing
+  local duplicate
+
+  candidates+=("$HOME/Library/CloudStorage/Dropbox")
+  candidates+=("$HOME/Dropbox")
+
+  if [[ -d "$HOME/Library/CloudStorage" ]]; then
+    while IFS= read -r candidate; do
+      duplicate=false
+      for existing in "${candidates[@]}"; do
+        if [[ "$existing" == "$candidate" ]]; then
+          duplicate=true
+          break
+        fi
+      done
+      [[ "$duplicate" == true ]] || candidates+=("$candidate")
+    done < <(find "$HOME/Library/CloudStorage" -maxdepth 1 -type d -name 'Dropbox*' -print 2>/dev/null | sort)
+  fi
+
+  local matches=()
+  for candidate in "${candidates[@]}"; do
+    if [[ -d "$candidate/Research" && -d "$candidate/ForShareLargeData" ]]; then
+      matches+=("$candidate")
+    fi
+  done
+
+  if [[ ${#matches[@]} -eq 1 ]]; then
+    printf '%s\n' "${matches[0]}"
+    return 0
+  fi
+
+  if [[ ${#matches[@]} -gt 1 ]]; then
+    echo "Multiple Dropbox roots contain both required directories:" >&2
+    printf '  %s\n' "${matches[@]}" >&2
+    echo "Rerun with --dropbox-home PATH." >&2
+    return 1
+  fi
+
+  return 1
+}
 
 if [[ -z "$DROPBOX_HOME" ]]; then
-  [[ -n "$WINDOWS_USER" ]] || fail "Could not detect the Windows user. Use --windows-user or --dropbox-home."
-  DROPBOX_HOME="/mnt/c/Users/$WINDOWS_USER/Dropbox"
+  case "$PLATFORM" in
+    linux)
+      is_wsl || fail "Linux is supported only under WSL2 by this setup script."
+      if [[ -z "$WINDOWS_USER" ]] && command -v cmd.exe >/dev/null 2>&1; then
+        WINDOWS_USER="$(cmd.exe /C 'echo %USERNAME%' 2>/dev/null | tr -d '\r' | tail -n 1)"
+      fi
+      [[ -n "$WINDOWS_USER" ]] || fail "Could not detect the Windows user. Use --windows-user or --dropbox-home."
+      DROPBOX_HOME="/mnt/c/Users/$WINDOWS_USER/Dropbox"
+      ;;
+    macos)
+      DROPBOX_HOME="$(find_macos_dropbox_home || true)"
+      [[ -n "$DROPBOX_HOME" ]] || fail "Could not identify the Dropbox root. Use --dropbox-home PATH."
+      ;;
+  esac
 fi
 
 RESEARCH_SOURCE="$DROPBOX_HOME/Research"
@@ -74,8 +133,8 @@ LARGE_SOURCE="$DROPBOX_HOME/ForShareLargeData"
 
 mkdir -p "$HOME/src" "$HOME/worktrees" "$HOME/scratch" "$HOME/data-roots" "$HOME/.local/bin"
 
-ln -sfnT "$RESEARCH_SOURCE" "$HOME/data-roots/Research"
-ln -sfnT "$LARGE_SOURCE" "$HOME/data-roots/ForShareLargeData"
+replace_symlink "$RESEARCH_SOURCE" "$HOME/data-roots/Research"
+replace_symlink "$LARGE_SOURCE" "$HOME/data-roots/ForShareLargeData"
 if [[ -L "$HOME/data-roots/LocalLarge" ]]; then
   rm -f "$HOME/data-roots/LocalLarge"
 fi
@@ -89,41 +148,43 @@ export WORKTREE_ROOT="$HOME/worktrees"
 export SCRATCH_ROOT="$HOME/scratch"
 EOF_ENV
 
-BASHRC_LINE='[ -f "$HOME/.research_env" ] && source "$HOME/.research_env"'
-if ! grep -Fqx "$BASHRC_LINE" "$HOME/.bashrc" 2>/dev/null; then
-  printf '\n%s\n' "$BASHRC_LINE" >> "$HOME/.bashrc"
-fi
+RC_FILE="$(shell_rc_file)"
+ensure_line "$RC_FILE" '[ -f "$HOME/.research_env" ] && source "$HOME/.research_env"'
+ensure_line "$RC_FILE" 'export PATH="$HOME/.local/bin:$PATH"'
 
-ln -sfnT "$INFRA_ROOT/scripts/new-project.sh" "$HOME/.local/bin/new-project"
-ln -sfnT "$INFRA_ROOT/scripts/new-worktree.sh" "$HOME/.local/bin/new-worktree"
-ln -sfnT "$INFRA_ROOT/scripts/remove-worktree.sh" "$HOME/.local/bin/remove-worktree"
-ln -sfnT "$INFRA_ROOT/scripts/setup-project-links.sh" "$HOME/.local/bin/setup-project-links"
-ln -sfnT "$INFRA_ROOT/scripts/doctor.sh" "$HOME/.local/bin/research-doctor"
-ln -sfnT "$INFRA_ROOT/scripts/install-agents.sh" "$HOME/.local/bin/install-coding-agents"
-ln -sfnT "$INFRA_ROOT/scripts/install-miniforge.sh" "$HOME/.local/bin/install-miniforge"
-ln -sfnT "$INFRA_ROOT/scripts/analysis-smoke-test.sh" "$HOME/.local/bin/analysis-smoke-test"
-ln -sfnT "$INFRA_ROOT/scripts/setup-vscode.sh" "$HOME/.local/bin/setup-vscode"
-ln -sfnT "$INFRA_ROOT/scripts/setup-agent-defaults.sh" "$HOME/.local/bin/setup-agent-defaults"
-ln -sfnT "$INFRA_ROOT/scripts/setup-emacs.sh" "$HOME/.local/bin/setup-emacs"
-
-PATH_LINE='export PATH="$HOME/.local/bin:$PATH"'
-if ! grep -Fqx "$PATH_LINE" "$HOME/.bashrc" 2>/dev/null; then
-  printf '%s\n' "$PATH_LINE" >> "$HOME/.bashrc"
-fi
+for command_pair in \
+  "new-project:new-project.sh" \
+  "new-worktree:new-worktree.sh" \
+  "remove-worktree:remove-worktree.sh" \
+  "setup-project-links:setup-project-links.sh" \
+  "research-doctor:doctor.sh" \
+  "install-coding-agents:install-agents.sh" \
+  "install-miniforge:install-miniforge.sh" \
+  "analysis-smoke-test:analysis-smoke-test.sh" \
+  "setup-vscode:setup-vscode.sh" \
+  "setup-agent-defaults:setup-agent-defaults.sh" \
+  "setup-emacs:setup-emacs.sh"
+do
+  command_name="${command_pair%%:*}"
+  script_name="${command_pair#*:}"
+  replace_symlink "$INFRA_ROOT/scripts/$script_name" "$HOME/.local/bin/$command_name"
+done
 
 info "Machine setup completed"
+echo "  Platform:                  $PLATFORM"
+echo "  Dropbox root:              $DROPBOX_HOME"
 echo "  Dropbox Research:          $RESEARCH_SOURCE"
 echo "  Dropbox ForShareLargeData: $LARGE_SOURCE"
 echo "  Environment file:          $HOME/.research_env"
+echo "  Shell startup file:        $RC_FILE"
 echo
-echo "Run: source ~/.bashrc"
+echo "Run: source '$RC_FILE'"
 echo "Then: hash -r && research-doctor"
-echo "After installing Windows Visual Studio Code: setup-vscode"
+echo "Configure VS Code extensions: setup-vscode"
 echo "Configure research-grade agent defaults: setup-agent-defaults"
-echo "Optional terminal editor: setup-emacs"
+echo "Optional Emacs editor: setup-emacs"
 echo
 echo "Project-specific local disks are optional and are linked in each project's"
 echo "scripts/setup-local-links.sh; no global local-data directory is required."
 echo
 echo "After pulling a newer infra version, rerun this script once to register any newly added commands."
-echo "Direct fallback: bash $INFRA_ROOT/scripts/setup-vscode.sh"

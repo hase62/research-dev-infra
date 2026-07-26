@@ -9,8 +9,12 @@ usage() {
 Usage:
   setup-emacs.sh [--gui] [--yes]
 
-Default installs terminal Emacs (emacs-nox), suitable for WSL terminals and
-VS Code integrated terminals. Use --gui to install emacs-gtk for WSLg.
+WSL2 default:
+  Installs terminal Emacs (emacs-nox). Use --gui for emacs-gtk with WSLg.
+
+macOS default:
+  Installs the Homebrew Emacs formula for terminal use. Use --gui to also
+  install the Emacs.app cask.
 USAGE
 }
 
@@ -36,13 +40,35 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-package="emacs-nox"
-if [[ "$GUI" == true ]]; then
-  package="emacs-gtk"
-fi
+OS="$(uname -s)"
+case "$OS" in
+  Linux)
+    grep -qi microsoft /proc/version 2>/dev/null || {
+      echo "ERROR: Linux setup is supported only under WSL2." >&2
+      exit 1
+    }
+    PLATFORM="wsl"
+    package="emacs-nox"
+    [[ "$GUI" == true ]] && package="emacs-gtk"
+    DESCRIPTION="Install $package with apt"
+    ;;
+  Darwin)
+    PLATFORM="macos"
+    command -v brew >/dev/null 2>&1 || {
+      echo "ERROR: Homebrew is required. Run scripts/bootstrap-macos.sh first." >&2
+      exit 1
+    }
+    DESCRIPTION="Install the Homebrew emacs formula"
+    [[ "$GUI" == true ]] && DESCRIPTION="$DESCRIPTION and the emacs-app cask"
+    ;;
+  *)
+    echo "ERROR: Unsupported operating system: $OS" >&2
+    exit 1
+    ;;
+esac
 
 cat <<NOTICE
-This installs $package with apt and configures Git to use Emacs.
+This will $DESCRIPTION and configure Git to use terminal Emacs.
 NOTICE
 
 if [[ "$YES" != true ]]; then
@@ -53,10 +79,20 @@ if [[ "$YES" != true ]]; then
   }
 fi
 
-sudo apt-get update
-sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "$package"
+if [[ "$PLATFORM" == "wsl" ]]; then
+  sudo apt-get update
+  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "$package"
+else
+  brew install emacs
+  if [[ "$GUI" == true ]]; then
+    brew install --cask emacs-app
+  fi
+fi
 
 git config --global core.editor "emacs -nw"
+if command -v gh >/dev/null 2>&1; then
+  gh config set editor "emacs -nw" >/dev/null
+fi
 
 mkdir -p "$HOME/.local/bin"
 cat > "$HOME/.local/bin/e" <<'WRAPPER'
@@ -65,7 +101,15 @@ exec emacs -nw "$@"
 WRAPPER
 chmod +x "$HOME/.local/bin/e"
 
-cat <<'DONE'
+if [[ "$PLATFORM" == "macos" && "$GUI" == true ]]; then
+  cat > "$HOME/.local/bin/emacs-gui" <<'WRAPPER'
+#!/usr/bin/env bash
+open -a Emacs "$@"
+WRAPPER
+  chmod +x "$HOME/.local/bin/emacs-gui"
+fi
+
+cat <<DONE
 Emacs setup completed.
 
 Terminal use:
@@ -75,6 +119,17 @@ Terminal use:
 Open a project:
   cd ~/src/<Project>
   e PROJECT.md
+DONE
+
+if [[ "$PLATFORM" == "macos" && "$GUI" == true ]]; then
+  cat <<'DONE'
+
+GUI use on macOS:
+  emacs-gui FILE
+DONE
+fi
+
+cat <<'DONE'
 
 VS Code and Emacs may both be open, but do not edit the same file in both at the
 same time. Codex and Claude Code still run from the project terminal.

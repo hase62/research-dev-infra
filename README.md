@@ -1,27 +1,27 @@
 # research-dev-infra
 
-WSL2、GitHub、Visual Studio Code、Emacs、Codex、Claude Code、Miniforge、既存Dropboxデータを併用し、複数の研究プロジェクトをできるだけ簡単に開始・継続するための共通基盤です。
+WSL2またはmacOS、GitHub、Visual Studio Code、Emacs、Codex、Claude Code、Miniforge、既存Dropboxデータを併用し、複数の研究プロジェクトをできるだけ簡単に開始・継続するための共通基盤です。
 
-このREADMEを、**WSL2をインストールした直後から最初の解析を始めるまでの標準手順書**として使用します。
+このREADMEを、**新しいWSL2 PCまたはMacを、最初の解析を開始できる状態にするまでの標準手順書**として使用します。
 
 ---
 
 ## 1. この仕組みの基本方針
 
 - 研究プロジェクトごとにGitHub repositoryを分ける。
-- Git repositoryはWSL2のLinux領域に置く。
+- Git repositoryはDropbox外の `~/src/` に置く。
 - Dropboxの既存構造は変更しない。
 - 必要なDropboxまたはローカルデータだけを、各projectの `.local/data/` にsymlinkする。
 - 大規模データ本体や解析中の出力はGitHubへ入れない。
 - Visual Studio Codeを共通の編集、Git差分確認、統合terminal、notebook実行の画面として使う。
-- EmacsはWSL2 terminal内の軽量editorとして併用できる。
+- Emacsはterminal editorとして併用できる。
 - CodexとClaude Codeは両方を導入し、対象project repositoryまたは専用worktreeの中から起動する。
 - どちらかの定額プランの利用上限に達したら、同じtask worktreeで停止し、もう一方へ順次切り替える。
 - 同じworking treeをCodexとClaude Codeに同時編集させない。
-- PC固有の設定は `~/.research_env` と `.local/` に閉じ込める。
+- PC/Mac固有の設定は `~/.research_env` と `.local/` に閉じ込める。
 - 新規project開始時にYAMLや複雑なデータカタログは要求しない。
 
-コードをLinuxコマンドで扱うため、Git working treeは `/mnt/c/...` やDropbox直下ではなく、WSL2の `~/src/` に置きます。Dropboxは既存データを参照するためのWindows側ストレージとして利用します。Windows版Visual Studio CodeからWSL extensionを介して、このLinux側repositoryを開きます。
+WSL2ではGit working treeをLinux filesystemの `~/src/` に置き、Windows版VS CodeからWSL extensionを介して開きます。macOSでは同じく `~/src/` にcloneし、Mac版VS CodeまたはEmacsで直接開きます。どちらの場合もコードをDropbox直下へ置きません。
 
 この手順でいう「Visual Studio」は **Visual Studio Code** を指します。Windows向けのフルIDEであるVisual Studioは、この構成の前提にはしていません。
 
@@ -29,8 +29,10 @@ WSL2、GitHub、Visual Studio Code、Emacs、Codex、Claude Code、Miniforge、�
 
 ## 2. 作成される全体構成
 
+WSL2とmacOSで論理構成を揃えます。
+
 ```text
-/home/<user>/
+~
 ├── src/
 │   ├── research-dev-infra/
 │   ├── Sepsis.Atlas/
@@ -49,12 +51,26 @@ WSL2、GitHub、Visual Studio Code、Emacs、Codex、Claude Code、Miniforge、�
 │
 └── data-roots/
     ├── Research
-    │   -> /mnt/c/Users/<WindowsUser>/Dropbox/Research
+    │   -> Dropbox/Research
     └── ForShareLargeData
-        -> /mnt/c/Users/<WindowsUser>/Dropbox/ForShareLargeData
+        -> Dropbox/ForShareLargeData
 ```
 
-PC全体で共通の大容量ローカルディスクは定義しません。必要なprojectだけが、任意の `/mnt/d/...`、`/mnt/e/...`、外付けSSD、HPC mountなどを直接参照します。
+実体パスはOSごとに異なります。
+
+```text
+WSL2:
+  /mnt/c/Users/<WindowsUser>/Dropbox/Research
+  /mnt/c/Users/<WindowsUser>/Dropbox/ForShareLargeData
+
+macOS File Provider:
+  ~/Library/CloudStorage/Dropbox/Research
+  ~/Library/CloudStorage/Dropbox/ForShareLargeData
+```
+
+Dropbox名にチーム名やアカウント名が付く場合は、`setup-machine.sh --dropbox-home PATH`で実際のDropbox rootを指定します。
+
+PC全体で共通の大容量ローカルディスクは定義しません。必要なprojectだけが、WSL2なら任意の `/mnt/d/...` や `/mnt/e/...`、macOSなら `/Volumes/<Disk>/...` などを直接参照します。
 
 各projectは次の最小構成を持ちます。
 
@@ -540,17 +556,12 @@ claude
 このinfraでは、新しいsessionの標準を次に固定します。
 
 ```text
-Codex       gpt-5.6         xhigh
-Codex Plan  gpt-5.6         xhigh
-Claude Code claude-opus-5   xhigh
+Codex       gpt-5.6   xhigh
+Codex Plan  gpt-5.6   xhigh
+Claude Code opus      xhigh、stable channel
 ```
 
-Claude Codeを先に最新版へ更新します。`claude-opus-5`にはClaude Code 2.1.219以降が必要です。
-
-```bash
-claude update
-claude --version
-```
+Claude Codeはstable channelを維持し、`opus`エイリアスを使用します。現時点ではstable channelで利用可能な最新のOpus 4系列を使用し、将来Opus 5がstableへ入った時点で、同じ`opus`設定のまま移行します。
 
 標準設定を反映します。
 
@@ -578,7 +589,8 @@ Claude Code `~/.claude/settings.json`：
 
 ```json
 {
-  "model": "claude-opus-5",
+  "autoUpdatesChannel": "stable",
+  "model": "opus",
   "effortLevel": "xhigh"
 }
 ```
@@ -616,7 +628,7 @@ Claude Codeの`--resume`または`--continue`は、保存時に使用してい�
 一時的に`max`を使う場合は、persistent defaultを変更せずsession単位で指定します。
 
 ```bash
-claude --model claude-opus-5 --effort max
+claude --model opus --effort max
 ```
 
 Codexはsession中の`/model`から一時的にeffortを変更します。
@@ -680,6 +692,198 @@ research-doctor
 - VS Code CLI（未導入ならwarningのみ）
 
 任意ツールがない場合はwarningになります。`Failures: 0`なら基盤としては利用可能です。
+
+---
+
+# Part I-B. Macを開発端末として追加する
+
+MacではWSL2を使いません。macOSのUnix環境へ直接repositoryをcloneし、Windows/WSL2と同じGitHub branch、Dropboxデータ、worktree運用を使用します。GPU PyTorchやCUDAを必要とする計算はWindows GPU、HPC、TSUBAME、Shirokaneなどへ残し、Macはコード開発、軽量解析、R/Python処理、ドキュメント、レビューに使用します。
+
+## 11A. macOSの前提
+
+- macOS 13以降を推奨する。
+- Apple SiliconとIntel Macの両方に対応する。
+- Dropbox desktop appへ同じアカウントでログインしておく。
+- 解析に使うDropboxファイルは「オンラインのみ」ではなく、Macへダウンロード済みにする。
+- repositoryはDropboxではなく `~/src/` に置く。
+
+Apple Command Line Toolsを導入します。
+
+```bash
+xcode-select --install
+```
+
+installer完了後、Terminalでinfraをcloneします。GitHub CLIがまだない最初のMacでは、先にGitHubのWeb画面からZIPを取得して `~/src/research-dev-infra` へ展開しても構いません。
+
+```bash
+mkdir -p ~/src
+cd ~/src
+git clone https://github.com/<GitHubAccount>/research-dev-infra.git
+cd research-dev-infra
+```
+
+private repositoryをHTTPS cloneできない段階では、ZIPからbootstrapを開始し、GitHub CLI認証後にclone版へ置き換えます。
+
+## 11B. Homebrewと基本ツールを導入する
+
+```bash
+cd ~/src/research-dev-infra
+
+bash scripts/bootstrap-macos.sh \
+  --git-name "Takanori Hasegawa" \
+  --git-email "GitHubに登録しているメールアドレス"
+```
+
+Visual Studio CodeとDropboxもHomebrewから導入する場合：
+
+```bash
+bash scripts/bootstrap-macos.sh \
+  --git-name "Takanori Hasegawa" \
+  --git-email "GitHubに登録しているメールアドレス" \
+  --desktop-apps
+```
+
+bootstrap後は新しいTerminalを開くか、次を実行します。
+
+```bash
+source ~/.zprofile
+```
+
+GitHubへログインします。
+
+```bash
+gh auth login
+gh auth setup-git
+gh auth status
+```
+
+## 11C. Mac版Dropbox rootを設定する
+
+Dropbox on File Providerでは通常、Dropboxは次の下にあります。
+
+```text
+~/Library/CloudStorage/Dropbox
+```
+
+実際の候補を確認します。
+
+```bash
+find "$HOME/Library/CloudStorage" \
+  -maxdepth 1 \
+  -type d \
+  -name 'Dropbox*' \
+  -print
+```
+
+`Research`と`ForShareLargeData`が通常のDropbox root直下にあれば、自動検出できます。
+
+```bash
+cd ~/src/research-dev-infra
+bash scripts/setup-machine.sh
+source ~/.zshrc
+hash -r
+```
+
+チーム名付きDropboxなどで自動検出できない場合：
+
+```bash
+bash scripts/setup-machine.sh \
+  --dropbox-home "$HOME/Library/CloudStorage/Dropbox <実際の名称>"
+```
+
+確認します。
+
+```bash
+ls -ld ~/data-roots/Research
+ls -ld ~/data-roots/ForShareLargeData
+research-doctor
+```
+
+## 11D. Mac版VS Codeを設定する
+
+まだ導入していない場合：
+
+```bash
+brew install --cask visual-studio-code
+```
+
+VS Codeを一度開き、Command Paletteから次を実行します。
+
+```text
+Shell Command: Install 'code' command in PATH
+```
+
+新しいTerminalを開いて確認します。
+
+```bash
+code --version
+setup-vscode
+```
+
+MacではWSL extensionを入れません。Codex、Claude Code、Python、Jupyter、Rのextensionだけを導入します。
+
+## 11E. MacへMiniforge、Codex、Claude Code、Emacsを導入する
+
+```bash
+install-miniforge
+source ~/.zshrc
+
+install-coding-agents
+source ~/.zshrc
+
+setup-agent-defaults
+setup-emacs
+```
+
+GUI版Emacsも追加する場合：
+
+```bash
+setup-emacs --gui
+```
+
+標準設定は両OSで同じです。
+
+```text
+Codex       gpt-5.6   xhigh
+Codex Plan  gpt-5.6   xhigh
+Claude Code opus      xhigh、stable channel
+```
+
+CodexとClaude CodeはMacでも個別にログインします。認証情報をGitHubやDropboxで同期しません。
+
+```bash
+codex login
+claude
+```
+
+最終確認：
+
+```bash
+research-doctor
+```
+
+## 11F. Macで既存projectを開始する
+
+```bash
+cd ~/src
+gh repo clone <GitHubAccount>/Sepsis.Atlas
+cd Sepsis.Atlas
+
+setup-project-links
+mamba env create -f environment.yml
+conda activate sepsis-atlas
+analysis-smoke-test Sepsis.Atlas
+code .
+```
+
+Mac固有のデータや外付けSSDが必要な場合だけ、projectの `scripts/setup-local-links.sh` へ追加します。
+
+```bash
+link_data "/Volumes/ExternalSSD/SepsisAtlas/data" local_data
+use_output_dir "/Volumes/ExternalSSD/SepsisAtlas/results/$WORKSPACE_NAME"
+```
+
+WSL2とMacで同じbranchを同時編集しません。端末を移る前にcommit/pushし、別端末でpullして再開します。
 
 ---
 
@@ -1320,11 +1524,11 @@ branchが未mergeなら、Gitが安全のため削除を拒否することがあ
 
 ---
 
-# Part VII. 2台目以降のPC
+# Part VII. 2台目以降のWindows/WSL2 PC
 
 ## 25. 方針
 
-2台目以降では、次をGitHubから取得します。
+2台目以降のWindows/WSL2 PCでは、次をGitHubから取得します。
 
 - `research-dev-infra`
 - 各研究project repository
@@ -1512,7 +1716,7 @@ use_output_dir "/mnt/e/<Project>/results/$WORKSPACE_NAME"
 
 ---
 
-## 32. WSL2 scratchに置くもの
+## 32. 端末ローカルのscratchに置くもの
 
 ```text
 ~/scratch/<Project>/<Workspace>
@@ -1527,7 +1731,7 @@ use_output_dir "/mnt/e/<Project>/results/$WORKSPACE_NAME"
 - cache
 - workflowの中間生成物
 
-Git repositoryと高頻度I/Oの作業領域をWSL2のLinux filesystemに置くことで、Linuxツール使用時の速度と互換性を確保します。
+WSL2ではLinux filesystem、macOSではMacのローカルfilesystemにGit repositoryと高頻度I/Oの作業領域を置きます。どちらもDropbox直下では実行しません。
 
 ---
 
@@ -1853,16 +2057,18 @@ codex
 
 | コマンド | 用途 |
 |---|---|
+| `bash scripts/bootstrap-ubuntu.sh` | WSL2 Ubuntuへ基本toolを導入 |
+| `bash scripts/bootstrap-macos.sh` | macOSへHomebrewと基本toolを導入 |
 | `new-project` | 新規project repositoryを作成 |
 | `new-worktree` | sharedまたはagent別のbranchとworktreeを作成 |
 | `remove-worktree` | worktreeを安全に削除 |
 | `setup-project-links` | `.local`のdata / scratch / output linkを生成 |
-| `research-doctor` | WSL2、GitHub、Dropbox、Agent環境を点検 |
+| `research-doctor` | WSL2/macOS、GitHub、Dropbox、Agent環境を点検 |
 | `install-coding-agents` | CodexとClaude Codeを公式installerで導入 |
-| `setup-vscode` | VS Codeの公式WSL、Codex、Claude Code、解析extensionを導入 |
-| `setup-agent-defaults` | Codex gpt-5.6/xhighとClaude Code claude-opus-5/xhighを標準設定 |
-| `setup-emacs` | WSL2へterminal Emacsを導入 |
-| `install-miniforge` | WSL2内へMiniforgeを導入 |
+| `setup-vscode` | OSに応じたVS Code、Codex、Claude Code、解析extensionを導入 |
+| `setup-agent-defaults` | Codex gpt-5.6/xhighとClaude Code stable/opus/xhighを標準設定 |
+| `setup-emacs` | WSL2またはmacOSへEmacsを導入 |
+| `install-miniforge` | WSL2またはmacOSへMiniforgeを導入 |
 | `analysis-smoke-test` | projectのGit、data link、scratch、Python/Rを確認 |
 
 各commandのhelp：
@@ -1904,6 +2110,7 @@ setup-emacs --help
 
 - [WSL2導入後から最初の解析まで](docs/FROM_WSL_TO_FIRST_ANALYSIS.md)
 - [マシン設定](docs/MACHINE_SETUP.md)
+- [Macセットアップ](docs/MAC_SETUP.md)
 - [新規project開始](docs/NEW_PROJECT.md)
 - [worktree運用](docs/WORKTREES.md)
 - [公式参照先](docs/OFFICIAL_REFERENCES.md)
@@ -1915,6 +2122,9 @@ READMEを標準手順書とし、詳細な背景や補足は `docs/` を参照�
 # Official references
 
 - [Microsoft: Working across Windows and Linux file systems](https://learn.microsoft.com/en-us/windows/wsl/filesystems)
+- [Visual Studio Code: Installing on macOS](https://code.visualstudio.com/docs/setup/mac)
+- [Dropbox: macOS File Provider support](https://help.dropbox.com/installs/dropbox-for-macos-support)
+- [Homebrew](https://brew.sh/)
 - [Microsoft: Set up a WSL development environment](https://learn.microsoft.com/en-us/windows/wsl/setup/environment)
 - [GitHub CLI: gh auth login](https://cli.github.com/manual/gh_auth_login)
 - [GitHub CLI: gh repo create](https://cli.github.com/manual/gh_repo_create)

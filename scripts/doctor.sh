@@ -9,11 +9,26 @@ ok() { printf '[OK]   %s\n' "$*"; }
 warn() { printf '[WARN] %s\n' "$*"; WARNINGS=$((WARNINGS + 1)); }
 fail_check() { printf '[FAIL] %s\n' "$*"; FAILURES=$((FAILURES + 1)); }
 
-if grep -qi microsoft /proc/version 2>/dev/null; then
-  ok "Running under WSL"
-else
-  warn "WSL was not detected"
-fi
+OS="${RESEARCH_PLATFORM_OVERRIDE:-$(uname -s)}"
+case "$OS" in
+  Darwin)
+    PLATFORM="macOS"
+    ok "Running on macOS"
+    ;;
+  Linux)
+    if grep -qi microsoft /proc/version 2>/dev/null; then
+      PLATFORM="WSL2"
+      ok "Running under WSL2"
+    else
+      PLATFORM="unsupported Linux"
+      fail_check "Linux was detected outside WSL2"
+    fi
+    ;;
+  *)
+    PLATFORM="unsupported"
+    fail_check "Unsupported operating system: $OS"
+    ;;
+esac
 
 if [[ -f "$HOME/.research_env" ]]; then
   ok "$HOME/.research_env exists"
@@ -23,7 +38,7 @@ else
   fail_check "$HOME/.research_env is missing"
 fi
 
-for command_name in git bash curl; do
+for command_name in git bash curl python3; do
   if command -v "$command_name" >/dev/null 2>&1; then
     ok "$command_name: $(command -v "$command_name")"
   else
@@ -73,11 +88,15 @@ from pathlib import Path
 
 path = Path(sys.argv[1])
 data = json.loads(path.read_text(encoding="utf-8"))
-expected = {"model": "claude-opus-5", "effortLevel": "xhigh"}
+expected = {
+    "autoUpdatesChannel": "stable",
+    "model": "opus",
+    "effortLevel": "xhigh",
+}
 raise SystemExit(0 if all(data.get(k) == v for k, v in expected.items()) else 1)
 PYCLAUDE
     then
-      ok "Claude Code defaults: claude-opus-5 / xhigh"
+      ok "Claude Code defaults: stable channel; opus / xhigh"
     else
       warn "Claude Code defaults differ from the research standard; run setup-agent-defaults"
     fi
@@ -92,10 +111,20 @@ fi
 if [[ -n "${CLAUDE_CODE_EFFORT_LEVEL:-}" ]]; then
   warn "CLAUDE_CODE_EFFORT_LEVEL overrides the Claude Code effort default"
 fi
+if [[ -n "${OPENAI_API_KEY:-}" ]]; then
+  warn "OPENAI_API_KEY is set; verify that Codex is using ChatGPT subscription authentication"
+fi
+if [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
+  warn "ANTHROPIC_API_KEY is set; Claude Code may use API billing instead of the subscription"
+fi
 
 if command -v code >/dev/null 2>&1; then
   extensions="$(code --list-extensions 2>/dev/null || true)"
-  for extension in ms-vscode-remote.remote-wsl openai.chatgpt anthropic.claude-code; do
+  expected_extensions=(openai.chatgpt anthropic.claude-code ms-python.python ms-toolsai.jupyter reditorsupport.r)
+  if [[ "$PLATFORM" == "WSL2" ]]; then
+    expected_extensions=(ms-vscode-remote.remote-wsl "${expected_extensions[@]}")
+  fi
+  for extension in "${expected_extensions[@]}"; do
     if grep -Fqi "$extension" <<<"$extensions"; then
       ok "VS Code extension: $extension"
     else
@@ -103,7 +132,6 @@ if command -v code >/dev/null 2>&1; then
     fi
   done
 fi
-
 
 if command -v git >/dev/null 2>&1; then
   git_name="$(git config --global user.name 2>/dev/null || true)"
@@ -139,7 +167,7 @@ if [[ -n "$PROJECT" && -n "${SRC_ROOT:-}" ]]; then
   echo
   echo "Project: $PROJECT"
 
-  if [[ -d "$REPO/.git" ]]; then
+  if git -C "$REPO" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     ok "Git repository: $REPO"
   else
     fail_check "Git repository not found: $REPO"

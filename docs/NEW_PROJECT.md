@@ -42,7 +42,7 @@ new-project Sepsis.Atlas --github my-organization/Sepsis.Atlas
     └── scratch -> ~/scratch/Sepsis.Atlas/main/scratch
 ```
 
-`.local/`はGit管理されません。標準ではscratchとworking outputをWSL内へ置きます。
+`.local/`はGit管理されません。標準ではscratchとworking outputを各端末の `~/scratch/` 以下へ置きます。
 
 ## 2. PROJECT.mdを書く
 
@@ -78,13 +78,21 @@ link_data "$LARGE_ROOT/Proteomics/PublicData" public_data
 PC固有のローカルSSDや外付けディスクを使う研究では、その実パスを直接指定します。
 
 ```bash
+# WSL2例
 link_data "/mnt/e/ProteomicAging/large_objects" large_objects
+
+# macOS例
+link_data "/Volumes/ExternalSSD/ProteomicAging/large_objects" large_objects
 ```
 
 working outputも外部ディスクへ置きたいprojectだけ、次を追加します。
 
 ```bash
+# WSL2例
 use_output_dir "/mnt/e/ProteomicAging/results/$WORKSPACE_NAME"
+
+# macOS例
+use_output_dir "/Volumes/ExternalSSD/ProteomicAging/results/$WORKSPACE_NAME"
 ```
 
 共通root変数は次の2つだけです。
@@ -161,6 +169,6 @@ research-doctor Sepsis.Atlas
 
 Dropbox内の必要なファイルをそのPCでローカル保存状態にします。project固有の外部ディスクパスがPCごとに異なる場合は、そのPCで `scripts/setup-local-links.sh` を調整するか、リンクを手動で作ります。
 
-## WSL2導入直後から始める場合
+## 新しい端末から始める場合
 
-GitHub、Miniforge、Codex、Claude Code、最初の解析環境がまだ未設定の場合は、先に [WSL2導入後から最初の解析まで](FROM_WSL_TO_FIRST_ANALYSIS.md) を実行してください。
+GitHub、Miniforge、Codex、Claude Code、最初の解析環境がまだ未設定の場合は、WSL2では [WSL2導入後から最初の解析まで](FROM_WSL_TO_FIRST_ANALYSIS.md)、Macでは [Macセットアップ](MAC_SETUP.md) を先に実行してください。
