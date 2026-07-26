@@ -136,7 +136,7 @@ git diff
 残す変更ならcommitします。
 
 ```bash
-git add <確認済みfile>
+git add -p
 git commit -m "Describe local changes"
 git pull --rebase
 ```
@@ -274,7 +274,7 @@ claude --version
 
 ---
 
-## Claude CodeがOpus 4系列しか表示しない
+## Claude Codeで期待したOpusが表示されない
 
 このinfraはstable channelを標準にしています。
 
@@ -286,7 +286,7 @@ claude --version
 }
 ```
 
-stable版がOpus 5へ対応するまでは、利用可能な最新Opus 4系列を使用します。
+`opus` aliasが解決されるmodelは、installed Claude Code version、stable channel、契約で利用可能なmodelに依存します。特定のmajor versionへ固定せず、新規sessionで実際のmodelを確認します。
 
 ```bash
 claude update
@@ -366,19 +366,9 @@ git status
 git diff
 ```
 
-Codexを停止後：
+Codexを停止したら同じVS Code windowでClaude Code extensionを開始し、Claude Codeを停止したらCodex extensionを開始します。CLIを使っている場合だけ、同じworktreeのterminalで`claude`または`codex`を起動します。
 
-```bash
-claude
-```
-
-Claudeを停止後：
-
-```bash
-codex
-```
-
-両方を同時実行しません。
+両方へ同時に編集指示を出しません。chat履歴は自動移行されないため、`handoffs/CURRENT.md`、commit、`git diff`を引継ぎの正本にします。
 
 ---
 
@@ -387,7 +377,8 @@ codex
 main working treeを確認します。
 
 ```bash
-cd ~/src/<Project>
+PROJECT="Sepsis.Atlas"
+cd "$HOME/src/$PROJECT"
 git status
 git diff
 ```
@@ -395,7 +386,9 @@ git diff
 変更をcommitまたはstashしてcleanにしてから再実行します。
 
 ```bash
-new-worktree <Project> shared <Task>
+PROJECT="Sepsis.Atlas"
+TASK="metadata-audit"
+new-worktree "$PROJECT" shared "$TASK"
 ```
 
 ---
@@ -405,13 +398,54 @@ new-worktree <Project> shared <Task>
 未commit変更がある場合は安全のため削除されません。
 
 ```bash
-cd ~/worktrees/<Project>/<Workspace>
+PROJECT="Sepsis.Atlas"
+WORKSPACE="shared-metadata-audit"
+cd "$WORKTREE_ROOT/$PROJECT/$WORKSPACE"
 git status
 git diff
 ```
 
 変更をcommit、退避、または明示的に破棄してから `remove-worktree` を実行します。
 
+
+---
+
+## `new-worktree`がlocal/remote divergenceを警告する
+
+同じtask branchを複数PCで並行編集した可能性があります。scriptは自動mergeしません。
+
+```bash
+PROJECT="Sepsis.Atlas"
+TASK="metadata-audit"
+cd "$WORKTREE_ROOT/$PROJECT/shared-$TASK"
+git status
+git branch -vv
+git log --oneline --graph --decorate --all -20
+```
+
+両方の変更が必要なら履歴を確認してrebaseまたはmergeします。不明な状態でforce pushしません。
+
+---
+
+## `remove-worktree --delete-branch`でbranchが残る
+
+worktree自体は削除済みでも、Gitがbranchをmerge済みと判断しない場合があります。squash mergeで起きることがあります。
+
+GitHubのPRがmerge済みで、mainに必要な変更が入っていることを確認してからlocal branchを削除します。
+
+```bash
+TASK="metadata-audit"
+git branch -D "work/$TASK"
+```
+
+remote branchが残っていれば、merge確認後に削除します。
+
+```bash
+TASK="metadata-audit"
+git push origin --delete "work/$TASK"
+```
+
+確認せずに`-D`やremote branch削除を実行しません。
 ---
 
 ## `analysis-smoke-test`でRだけwarningになる
@@ -419,7 +453,7 @@ git diff
 Rを使わないprojectなら問題ありません。Rを使用する場合はproject環境へ追加します。
 
 ```bash
-mamba install -n <environment> -c conda-forge r-base r-irkernel
+mamba install -n sepsis-atlas -c conda-forge r-base r-irkernel
 ```
 
 ---
@@ -429,7 +463,7 @@ mamba install -n <environment> -c conda-forge r-base r-irkernel
 push前ならstageから外します。
 
 ```bash
-git restore --staged <file>
+git restore --staged path/to/file
 ```
 
 `.gitignore`へ追加し、必要ならDropboxまたはproject固有local diskへ移します。

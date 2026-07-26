@@ -132,5 +132,7 @@ fi
 cat <<'DONE'
 
 VS Code and Emacs may both be open, but do not edit the same file in both at the
-same time. Codex and Claude Code still run from the project terminal.
+same time. Use the Codex or Claude Code VS Code extension as the standard UI;
+the project terminal remains available for Git, environments, tests, and the
+optional CLI interfaces.
 DONE

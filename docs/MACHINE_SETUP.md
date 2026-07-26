@@ -128,7 +128,7 @@ Claude Code stable channel / opus / xhigh
 
 ```bash
 research-doctor
-research-doctor <Project>
+research-doctor Sepsis.Atlas
 ```
 
 `Failures: 0`なら共通基盤は利用可能です。未導入の任意ツールはwarningとして表示されます。

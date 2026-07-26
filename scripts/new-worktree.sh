@@ -24,16 +24,19 @@ MODE may be:
 
 Behavior:
   - If the task branch does not exist, create it from BASE (default: main).
-  - If the task branch exists locally, attach a new local worktree to it.
-  - If origin has the task branch, create a local tracking branch and resume it.
+  - If the task branch exists locally, attach a worktree and fast-forward it
+    from origin when possible.
+  - If only origin has the task branch, create a local tracking branch and
+    resume it.
 
-This means the same command can start a task on one PC and reconstruct its
-worktree on another PC after the branch has been committed and pushed.
+Use one unique TASK name for one logical task. Reuse the same TASK name while
+that task is active, including on another PC. After merge, remove the worktree
+and branches; use a new TASK name for the next task.
 
 Examples:
-  new-worktree Sepsis.Atlas shared task-001-qc
-  new-worktree Sepsis.Atlas codex task-001-qc
-  new-worktree Sepsis.Atlas claude review-001-qc work/task-001-qc
+  new-worktree Sepsis.Atlas shared metadata-audit
+  new-worktree Sepsis.Atlas shared task-002-qc-pipeline
+  new-worktree Sepsis.Atlas claude review-metadata-audit work/metadata-audit
 USAGE
 }
 
@@ -87,6 +90,25 @@ if git -C "$REPO" show-ref --verify --quiet "$LOCAL_REF"; then
   fi
   git -C "$REPO" worktree add "$TARGET" "$BRANCH"
   ACTION="resumed from local branch"
+
+  if git -C "$REPO" show-ref --verify --quiet "$REMOTE_REF"; then
+    git -C "$TARGET" branch --set-upstream-to="origin/$BRANCH" "$BRANCH" >/dev/null 2>&1 || true
+
+    if git -C "$REPO" merge-base --is-ancestor "$LOCAL_REF" "$REMOTE_REF"; then
+      if [[ "$(git -C "$REPO" rev-parse "$LOCAL_REF")" != "$(git -C "$REPO" rev-parse "$REMOTE_REF")" ]]; then
+        git -C "$TARGET" merge --ff-only "origin/$BRANCH"
+        ACTION="resumed from local branch and fast-forwarded from origin/$BRANCH"
+      else
+        ACTION="resumed from local branch (already synchronized with origin/$BRANCH)"
+      fi
+    elif git -C "$REPO" merge-base --is-ancestor "$REMOTE_REF" "$LOCAL_REF"; then
+      ACTION="resumed from local branch (local commits are ahead of origin/$BRANCH)"
+    else
+      warn "Local and remote task branches have diverged: $BRANCH"
+      warn "The worktree was created without merging. Inspect both histories before continuing."
+      ACTION="resumed from diverged local branch"
+    fi
+  fi
 elif git -C "$REPO" show-ref --verify --quiet "$REMOTE_REF"; then
   git -C "$REPO" worktree add --track -b "$BRANCH" "$TARGET" "origin/$BRANCH"
   ACTION="resumed from origin/$BRANCH"

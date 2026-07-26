@@ -16,9 +16,13 @@ usage() {
 Usage:
   remove-worktree PROJECT MODE TASK [--delete-branch]
 
+The worktree path is always local to the current computer. --delete-branch
+also deletes the local task branch after Git confirms that it is merged. It
+does not delete the branch from GitHub.
+
 Examples:
-  remove-worktree Sepsis.Atlas shared task-001-qc
-  remove-worktree Sepsis.Atlas codex experiment-001 --delete-branch
+  remove-worktree Sepsis.Atlas shared metadata-audit
+  remove-worktree Sepsis.Atlas shared task-002-qc-pipeline --delete-branch
 USAGE
 }
 
@@ -61,11 +65,19 @@ fi
 
 git -C "$REPO" worktree remove "$TARGET"
 
+info "Worktree removed: $TARGET"
+
 if [[ "$DELETE_BRANCH" == true ]]; then
-  git -C "$REPO" branch -d "$BRANCH"
+  if git -C "$REPO" branch -d "$BRANCH"; then
+    echo "Local branch deleted: $BRANCH"
+  else
+    warn "The worktree was removed, but the local branch was retained because Git does not consider it merged: $BRANCH"
+    warn "Verify the PR/merge before deleting it manually. A squash merge may require an explicit force delete after verification."
+    exit 1
+  fi
+else
+  echo "Local branch retained: $BRANCH"
 fi
 
-info "Worktree removed: $TARGET"
-if [[ "$DELETE_BRANCH" != true ]]; then
-  echo "Branch retained: $BRANCH"
-fi
+echo "Remote branch is unchanged. Delete it through the merged PR setting or with:"
+echo "  git -C '$REPO' push origin --delete '$BRANCH'"

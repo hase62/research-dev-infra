@@ -126,49 +126,62 @@ git push
 
 データ本体やsymlinkは `.local/`配下なのでcommitされません。`scripts/setup-local-links.sh`にはDropboxの共通パスや、必要なproject固有のローカルパスだけが残ります。
 
-## 5. CodexまたはClaude Codeを起動する
+## 5. VS Codeで作業を始める
 
-main working treeで単独作業する場合：
+小さな作業ならmain checkoutを開きます。
 
 ```bash
 cd ~/src/Sepsis.Atlas
 code .
 ```
 
-VS Codeのterminalから、どちらか一方を起動します。
+CodexまたはClaude CodeのVS Code extensionを標準UIとして使います。Git、解析環境、testはintegrated terminalから実行します。CLI固有機能が必要な場合だけ、同じproject terminalで`codex`または`claude`を起動します。
+
+Agentは必ずproject rootまたはtask worktreeから開始し、Dropbox rootやhome directoryから起動しません。
+
+## 6. 長いtaskは専用worktreeを使う
+
+1つの論理taskに1つのtask名を付けます。
 
 ```bash
-codex
-```
-
-```bash
-claude
-```
-
-Agentは必ずproject rootまたはそのworktreeから起動します。
-
-## 6. 切替可能なtask worktreeを使う
-
-```bash
-new-worktree Sepsis.Atlas shared task-001-qc-audit
-cd ~/worktrees/Sepsis.Atlas/shared-task-001-qc-audit
+new-worktree Sepsis.Atlas shared metadata-audit
+cd ~/worktrees/Sepsis.Atlas/shared-metadata-audit
 code .
 ```
 
-CodexまたはClaude Codeを起動し、一方の利用上限に達したら同じworktreeで他方へ切り替えます。同時には起動しません。
+このtaskが続く間は同じworktreeを使います。CodexからClaude Codeへ切り替える場合もbranchは替えず、`handoffs/CURRENT.md`とGit差分で引き継ぎます。両Agentへ同時に編集指示を出しません。
 
-## 7. 別PCで再開する
+作業完了後は、test、commit、push、PR、mergeを行い、worktreeとtask branchを削除します。次のtaskには新しいtask名を付けます。番号は任意で、自動採番されません。
+
+詳細は[worktree運用](WORKTREES.md)を参照してください。
+
+## 7. 別PCでprojectまたはtaskを再開する
+
+project repositoryがない場合：
 
 ```bash
+GITHUB_ACCOUNT="hase62"
 cd ~/src
-gh repo clone <ACCOUNT>/Sepsis.Atlas
+gh repo clone "$GITHUB_ACCOUNT/Sepsis.Atlas"
 cd Sepsis.Atlas
 setup-project-links
 research-doctor Sepsis.Atlas
 ```
 
-Dropbox内の必要なファイルをそのPCでローカル保存状態にします。project固有の外部ディスクパスがPCごとに異なる場合は、そのPCで `scripts/setup-local-links.sh` を調整するか、リンクを手動で作ります。
+Dropbox内の必要なfileをそのPCでローカル保存状態にします。外部disk pathがPCごとに異なる場合は、そのPCの実パスに合わせてlink設定を調整します。
+
+進行中のtaskを再開する場合は、同じtask名でlocal worktreeを再構築します。
+
+```bash
+cd ~/src/Sepsis.Atlas
+git fetch --all --prune
+new-worktree Sepsis.Atlas shared metadata-audit
+cd ~/worktrees/Sepsis.Atlas/shared-metadata-audit
+code .
+```
+
+移動元PCでは、先に`handoffs/CURRENT.md`を更新し、checkpoint commitをpushします。未commit変更、`.local`、解析環境、scratch output、Agent chat sessionは別PCへ移りません。
 
 ## 新しい端末から始める場合
 
-GitHub、Miniforge、Codex、Claude Code、最初の解析環境がまだ未設定の場合は、WSL2では [WSL2導入後から最初の解析まで](FROM_WSL_TO_FIRST_ANALYSIS.md)、Macでは [Macセットアップ](MAC_SETUP.md) を先に実行してください。
+GitHub、Miniforge、Codex、Claude Code、解析環境が未設定なら、WSL2では[WSL2導入後から最初の解析まで](FROM_WSL_TO_FIRST_ANALYSIS.md)、Macでは[Macセットアップ](MAC_SETUP.md)を先に実行してください。

@@ -1,23 +1,18 @@
 # WSL2導入後から最初の解析まで
 
-この文書は、WSL2とUbuntuをインストールした直後から、GitHub、Dropbox、Miniforge、Codex、Claude Codeを準備し、最初の研究repositoryで解析を実行するまでの一本道です。
+この文書は、Windows 11上のWSL2 Ubuntuを、`research-dev-infra`を使って研究開発端末へ設定する手順です。共通方針と日常運用はrepository rootの[README](../README.md)を正本とします。
 
-Macを設定する場合は [Macセットアップ](MAC_SETUP.md) を参照してください。
+前提：
 
-構成は次を前提とします。
+- codeはWSL2の`~/src/<Project>`へ置く。
+- Dropboxの既存構造は変更しない。
+- 必要なデータだけprojectの`.local/data/`へlinkする。
+- VS Codeを標準UIとし、Codex／Claude Code extensionを使う。
+- 長いtaskはtask worktreeとGitHub branchで管理する。
 
-- コードはWSL2内の `~/src/<Project>` に置く
-- GitHub repositoryは研究プロジェクトごとに分ける
-- Dropboxの既存構造は変更しない
-- 必要なDropboxディレクトリだけをprojectの `.local/data/` にsymlinkする
-- 大規模なPC固有データは、必要なprojectだけ任意のローカルパスから参照する
-- CodexとClaude Codeはproject rootまたはworktreeから起動する
+## 1. WindowsとWSL2を確認する
 
----
-
-## 0. Windows側で確認する
-
-PowerShellで次を実行します。
+PowerShell：
 
 ```powershell
 wsl --status
@@ -25,185 +20,124 @@ wsl --list --verbose
 wsl --update
 ```
 
-UbuntuのVERSIONが2であることを確認します。
+Ubuntuがversion 2であることを確認します。
 
-Dropbox desktop applicationもWindows側で起動し、次のディレクトリが実在することを確認します。
+Windows側のDropboxに次が存在することを確認します。
 
 ```text
 C:\Users\<WindowsUser>\Dropbox\Research
 C:\Users\<WindowsUser>\Dropbox\ForShareLargeData
 ```
 
-解析で使用するDropboxファイルは、必要に応じてWindows側でローカル保存状態にします。オンラインのみのまま大量解析を始めないでください。
+解析に使うDropbox fileは、必要に応じてWindows側でローカル保存状態にします。
 
----
+## 2. infraを取得する
 
-## 1. Ubuntuを開き、Linuxホームを確認する
-
-Ubuntu terminalを開きます。
+GitHub CLIと認証がすでに使える場合：
 
 ```bash
-whoami
-pwd
-uname -a
+mkdir -p ~/src
+cd ~/src
+gh repo clone hase62/research-dev-infra
+cd research-dev-infra
 ```
 
-通常、作業場所は次です。
+まだGitHub CLIを使えない場合は、GitHubのWeb画面からZIPを取得し、`~/src/research-dev-infra`へ展開します。bootstrapとGitHub認証後に、ZIP版をGit clone版へ置き換えます。
 
-```text
-/home/<LinuxUser>
-```
-
-コードは `/mnt/c/...` ではなくLinuxホーム以下に置きます。
-
----
-
-## 2. 初回だけ：infra ZIPをWSLへ展開する
-
-このinfra repositoryがまだGitHubにない最初のPCでは、配布ZIPをWindowsのDownloadsなどに保存してから展開します。
-
-Ubuntu初期状態で `unzip` がない場合だけ、先に導入します。
+Ubuntu初期状態で`unzip`がない場合：
 
 ```bash
 sudo apt-get update
 sudo apt-get install -y unzip
 ```
 
-その後、ZIPを展開します。
-
-```bash
-mkdir -p ~/src
-cd ~/src
-
-unzip "/mnt/c/Users/<WindowsUser>/Downloads/research-dev-infra.zip"
-cd research-dev-infra
-```
-
-ZIPの置き場所が異なる場合はパスを変更してください。
-
-すでにinfraをGitHubへpush済みの2台目以降では、「12. 2台目以降のPC」を参照します。
-
----
-
-## 3. Ubuntuの基本ツールとGitHub CLIを導入する
-
-Gitで使用する表示名とメールアドレスを指定します。
-
-```bash
-bash scripts/bootstrap-ubuntu.sh \
-  --git-name "Your Name" \
-  --git-email "your-address@example.com"
-```
-
-このscriptはGit、curl、unzip、rsync、build-essential、GitHub CLIなどを導入し、次のGit設定を行います。
-
-```text
-init.defaultBranch=main
-core.autocrlf=input
-pull.rebase=true
-fetch.prune=true
-push.autoSetupRemote=true
-```
-
-確認します。
-
-```bash
-git --version
-gh --version
-git config --global --list
-```
-
-### GitHubへログイン
-
-```bash
-gh auth login
-```
-
-通常は次を選択します。
-
-```text
-GitHub.com
-HTTPS
-Login with a web browser
-```
-
-認証確認：
-
-```bash
-gh auth status
-gh config set git_protocol https
-```
-
-HTTPSを標準にすると、PCごとのSSH鍵準備なしで開始できます。HPCなどSSHが適する環境では後からSSHへ切り替えて構いません。
-
----
-
-## 4. infra自体をprivate GitHub repositoryへ登録する
-
-最初のPCだけで実行します。
+## 3. Ubuntu基本toolを導入する
 
 ```bash
 cd ~/src/research-dev-infra
 
-git init -b main
-git add .
-git commit -m "Initialize research development infrastructure"
-
-gh repo create research-dev-infra \
-  --private \
-  --source=. \
-  --remote=origin \
-  --push
+bash scripts/bootstrap-ubuntu.sh \
+  --git-name "Takanori Hasegawa" \
+  --git-email "GitHubに登録しているメールアドレス"
 ```
 
-確認：
+確認時は`BOOTSTRAP`と入力します。
+
+## 4. GitHubへログインする
 
 ```bash
-git remote -v
-git status
-gh repo view --web
+gh auth login
+gh auth setup-git
+gh auth status
 ```
 
-以後、このrepositoryが新しいPCの共通セットアップ元になります。
+通常は`GitHub.com`、`HTTPS`、browser loginを選びます。
 
----
+ZIPから開始した場合は、認証後にclone版へ置き換えます。
 
-## 5. Dropboxの共通参照ルートを接続する
+```bash
+cd ~/src
+mv research-dev-infra research-dev-infra-from-zip
+gh repo clone hase62/research-dev-infra
+cd research-dev-infra
+```
+
+clone版の確認後、ZIP版を削除します。
+
+## 5. Dropbox rootと共通commandを設定する
 
 ```bash
 cd ~/src/research-dev-infra
 bash scripts/setup-machine.sh
 source ~/.bashrc
+hash -r
+```
+
+Dropboxを自動検出できない場合：
+
+```bash
+bash scripts/setup-machine.sh \
+  --dropbox-home "/mnt/c/Users/<WindowsUser>/Dropbox"
 ```
 
 確認：
 
 ```bash
+ls -ld ~/data-roots/Research
+ls -ld ~/data-roots/ForShareLargeData
+command -v new-project
+command -v new-worktree
 research-doctor
-ls -la ~/data-roots
 ```
 
-期待されるリンク：
+## 6. VS Codeを設定する
 
-```text
-~/data-roots/Research
-  -> /mnt/c/Users/<WindowsUser>/Dropbox/Research
+Windows側のVS Codeを最新版へ更新してから、Ubuntuで実行します。
 
-~/data-roots/ForShareLargeData
-  -> /mnt/c/Users/<WindowsUser>/Dropbox/ForShareLargeData
+```bash
+setup-vscode
 ```
 
-この段階ではDドライブや外付けSSDを登録しません。大規模ローカルデータが必要なprojectだけ、後で `scripts/setup-local-links.sh` に任意の実パスを記載します。
+projectはUbuntu terminalから開きます。
 
----
+```bash
+cd ~/src/research-dev-infra
+code .
+```
 
-## 6. Miniforgeを導入する
+左下に`WSL: Ubuntu`などが表示されることを確認します。Windows側から`\\wsl$`経由で直接編集するのではなく、Remote WSLとして開きます。
 
-解析環境はWindows側のCondaとは分離し、WSL2内にMiniforgeを導入します。
+## 7. Miniforge、Codex、Claude Code、Emacs
 
 ```bash
 install-miniforge
 source ~/.bashrc
+
+install-coding-agents
+source ~/.bashrc
+
+setup-agent-defaults
+setup-emacs
 ```
 
 確認：
@@ -211,364 +145,120 @@ source ~/.bashrc
 ```bash
 conda --version
 mamba --version
-conda config --show auto_activate_base
-```
-
-`auto_activate_base: false`になっていることを確認します。project packageをbaseへ入れず、研究ごとに環境を作ります。
-
----
-
-## 7. CodexとClaude Codeを導入する
-
-```bash
-install-coding-agents
-source ~/.bashrc
-```
-
-確認：
-
-```bash
 codex --version
 claude --version
+emacs --version
 ```
 
-各PCで個別にログインします。
+CodexとClaude Codeへ端末ごとにログインします。
 
 ```bash
-codex
+codex login
 claude
 ```
 
-認証情報やホームディレクトリ下のAgent設定全体をDropboxで同期しません。
+credentialやAgent設定directory全体をDropboxで同期しません。
 
----
-
-## 8. 任意：VS CodeをWSLへ接続する
-
-Windows側にVS CodeとWSL extensionを導入した後、Ubuntuでproject directoryから実行します。
-
-```bash
-cd ~/src/research-dev-infra
-code .
-```
-
-画面左下がWSL接続になっていることを確認します。Windows側から `\\wsl$` 経由で直接編集するのではなく、Remote WSLとして開きます。
-
-Dockerは必要なprojectで後から導入します。最初の解析開始には必須ではありません。
-
----
-
-## 9. 最初の研究projectを作る
-
-例として `ProteomicAging` を作ります。
-
-```bash
-new-project ProteomicAging --github
-cd ~/src/ProteomicAging
-```
-
-これにより次が作成されます。
-
-```text
-~/src/ProteomicAging
-~/worktrees/ProteomicAging
-~/scratch/ProteomicAging
-GitHub private repository: ProteomicAging
-```
-
-まず研究概要を数行書きます。
-
-```bash
-nano PROJECT.md
-```
-
-例：
-
-```markdown
-# ProteomicAging
-
-## Goal
-
-細胞種別プロテオミクスを用いて加齢関連変化を解析する。
-
-## Current phase
-
-公開データの取得と再現解析。
-```
-
----
-
-## 10. 必要なDropboxまたはローカルデータだけを接続する
-
-```bash
-nano scripts/setup-local-links.sh
-```
-
-末尾に必要なリンクだけ追加します。
-
-```bash
-link_data "$RESEARCH_ROOT/Papers/Aging/Proteomics" papers
-link_data "$LARGE_ROOT/Proteomics/PublicData" public_data
-link_data "/mnt/e/ProteomicAging/large_objects" large_objects
-
-# 必要なprojectだけoutputも外部ディスクへ変更
-use_output_dir "/mnt/e/ProteomicAging/results/$WORKSPACE_NAME"
-```
-
-反映：
-
-```bash
-setup-project-links
-research-doctor ProteomicAging
-```
-
-確認：
-
-```bash
-find .local -maxdepth 2 -type l -print -exec readlink {} \;
-```
-
-CodexとClaude CodeにはDropboxルート全体ではなく、`.local/data/`に公開した場所だけを利用させます。
-
----
-
-## 11. project専用の解析環境を作る
-
-### Python中心の例
-
-```bash
-mamba create -n proteomic-aging \
-  -c conda-forge \
-  python=3.12 \
-  pip \
-  jupyterlab \
-  ipykernel \
-  numpy \
-  pandas \
-  scipy \
-  matplotlib
-
-conda activate proteomic-aging
-```
-
-### R中心の例
-
-```bash
-mamba create -n proteomic-aging-r \
-  -c conda-forge \
-  -c bioconda \
-  r-base \
-  r-irkernel \
-  r-data.table \
-  r-tidyverse
-
-conda activate proteomic-aging-r
-```
-
-### RとPythonを同じ環境で使う例
-
-```bash
-mamba create -n proteomic-aging \
-  -c conda-forge \
-  -c bioconda \
-  python=3.12 \
-  pip \
-  jupyterlab \
-  numpy \
-  pandas \
-  r-base \
-  r-irkernel \
-  r-data.table
-
-conda activate proteomic-aging
-```
-
-本格的なprojectでは、環境が固まった段階で次のどちらかをGit管理します。
-
-```bash
-conda env export --from-history > environment.yml
-```
-
-または、より厳密に再現する場合：
-
-```bash
-conda env export > environment.lock.yml
-```
-
-最初から巨大な環境定義を作る必要はありません。
-
----
-
-## 12. 最初の解析を実行する
-
-Python例：
-
-```bash
-mkdir -p analysis
-cat > analysis/hello_analysis.py <<'PY'
-from pathlib import Path
-import pandas as pd
-
-out = Path(".local/output/hello_analysis.tsv")
-out.parent.mkdir(parents=True, exist_ok=True)
-
-result = pd.DataFrame(
-    {"status": ["ok"], "message": ["WSL2 analysis environment is ready"]}
-)
-result.to_csv(out, sep="\t", index=False)
-print(result)
-print(f"written: {out}")
-PY
-
-python analysis/hello_analysis.py
-```
-
-R例：
-
-```bash
-cat > analysis/hello_analysis.R <<'RS'
-out <- ".local/output/hello_analysis_R.tsv"
-result <- data.frame(
-  status = "ok",
-  message = "WSL2 R environment is ready"
-)
-write.table(result, out, sep = "\t", row.names = FALSE, quote = FALSE)
-print(result)
-cat("written:", out, "\n")
-RS
-
-Rscript analysis/hello_analysis.R
-```
-
-infraのsmoke testも実行します。
-
-```bash
-analysis-smoke-test ProteomicAging
-```
-
-問題がなければコードと環境定義だけcommitします。`.local/`以下のデータや出力はcommitされません。
-
-```bash
-git status
-git add PROJECT.md scripts/setup-local-links.sh analysis environment.yml
-git commit -m "Add initial analysis environment and smoke test"
-git push
-```
-
-`environment.yml`をまだ作っていない場合は、その引数を外してください。
-
----
-
-## 13. CodexまたはClaude Codeで作業を開始する
-
-単独の小さな作業ならmain repositoryから開始できます。
-
-```bash
-cd ~/src/ProteomicAging
-conda activate proteomic-aging
-codex
-```
-
-または：
-
-```bash
-cd ~/src/ProteomicAging
-conda activate proteomic-aging
-claude
-```
-
-最初の依頼例：
-
-```text
-PROJECT.mdを読み、現在のrepository構造と.local/dataの利用可能な入力を確認してください。
-入力データは変更せず、最初のデータinventoryをanalysis/に実装し、結果は.local/outputへ出してください。
-commitやpushは行わないでください。
-```
-
-並列タスクや独立レビューではworktreeを使います。
-
-```bash
-new-worktree ProteomicAging codex task-001-data-inventory
-cd ~/worktrees/ProteomicAging/codex-task-001-data-inventory
-conda activate proteomic-aging
-codex
-```
-
----
-
-## 14. 2台目以降のPC
-
-Ubuntu基本ツールとGitHub CLIを導入し、GitHubへログインした後：
-
-```bash
-mkdir -p ~/src
-cd ~/src
-gh repo clone <GitHubAccount>/research-dev-infra
-cd research-dev-infra
-
-bash scripts/setup-machine.sh
-source ~/.bashrc
-install-miniforge
-install-coding-agents
-research-doctor
-```
-
-既存projectを取得：
+## 8. 既存projectを再開する
 
 ```bash
 cd ~/src
-gh repo clone <GitHubAccount>/ProteomicAging
-cd ProteomicAging
+gh repo clone hase62/Sepsis.Atlas
+cd Sepsis.Atlas
+
 setup-project-links
-research-doctor ProteomicAging
+research-doctor Sepsis.Atlas
 ```
 
-project環境は `environment.yml` があれば再作成します。
+`environment.yml`がある場合：
 
 ```bash
 mamba env create -f environment.yml
+conda activate sepsis-atlas
+analysis-smoke-test Sepsis.Atlas
 ```
 
-同じbranchの未push変更を複数PCに残さないことが重要です。PCを移る前にcommitとpushを行います。
-
----
-
-## 15. 日常の開始・終了
-
-### 作業開始
+すでにclone済みなら：
 
 ```bash
-cd ~/src/ProteomicAging
-git fetch --all --prune
+cd ~/src/Sepsis.Atlas
 git pull --rebase
-conda activate proteomic-aging
-research-doctor ProteomicAging
+setup-project-links
 ```
 
-### 作業終了
+## 9. 新規projectを作る
+
+```bash
+new-project NewProject --github
+cd ~/src/NewProject
+```
+
+次を編集します。
+
+```text
+PROJECT.md
+scripts/setup-local-links.sh
+```
+
+linkを反映します。
+
+```bash
+setup-project-links
+research-doctor NewProject
+```
+
+詳細は[新規project開始](NEW_PROJECT.md)を参照してください。
+
+## 10. 解析環境を作る
+
+例：
+
+```bash
+mamba create -n new-project \
+  -c conda-forge -c bioconda \
+  python=3.12 pip jupyterlab numpy pandas scipy matplotlib \
+  r-base r-irkernel r-data.table
+
+conda activate new-project
+conda env export --from-history > environment.yml
+analysis-smoke-test NewProject
+```
+
+projectごとに必要なpackageだけを追加します。Windows側のConda環境はWSL2へ共有しません。
+
+## 11. VS CodeでAgent作業を始める
+
+小さな作業：
+
+```bash
+cd ~/src/NewProject
+code .
+```
+
+VS CodeのCodexまたはClaude Code extensionを開始します。CLIを使う場合だけintegrated terminalで`codex`または`claude`を起動します。
+
+長いtask：
+
+```bash
+cd ~/src/NewProject
+git switch main
+git pull --rebase
+new-worktree NewProject shared metadata-audit
+cd ~/worktrees/NewProject/shared-metadata-audit
+code .
+```
+
+worktreeの命名、別PCでの再開、task完了後の削除は[worktree運用](WORKTREES.md)を参照してください。
+
+## 12. 端末を移る前
 
 ```bash
 git status
 git diff
-git add <必要なコードと文書>
-git commit -m "Describe the change"
+# handoffs/CURRENT.mdを更新
+git add -p
+git commit -m "WIP: checkpoint current task"
 git push
 ```
 
-Dropboxはデータ参照、GitHubはコード同期です。DropboxをGit repositoryの同期手段にしません。
-
-
-## Codex installerで起動を選び、Claudeが入らなかった場合
-
-古い `install-agents.sh` ではCodex installerが対話モードで動き、
-`Start Codex now?` に `y` と答えると、後続のClaude Code installerへ
-到達しないことがありました。Codexが入っていてClaudeだけ未導入なら、次を実行します。
-
-```bash
-curl -fsSL https://claude.ai/install.sh | bash -s stable
-hash -r
-claude --version
-```
-
-現在のscriptはCodex installerを `CODEX_NON_INTERACTIVE=1` で実行し、
-インストール中にCodexを自動起動しません。
+別PCでは同じtask名で`new-worktree`を実行し、GitHub上のtask branchからlocal worktreeを再構築します。未commit変更、`.local`、conda環境、`~/scratch`、Agent chat sessionは移動しません。

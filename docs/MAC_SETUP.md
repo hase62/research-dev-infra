@@ -1,6 +1,6 @@
 # macOS導入後から最初の解析まで
 
-この文書は、MacをWindows/WSL2と同じ研究開発環境へ追加するための手順です。
+この文書は、macOSを`research-dev-infra`で研究開発端末へ設定する手順です。Windows/WSL2端末の有無に関係なく、同じGitHub repositoryとDropbox data rootを利用できます。
 
 ## 1. Apple Command Line Tools
 
@@ -15,9 +15,10 @@ installer完了後、Terminalを開き直します。
 GitHub CLIがすでにある場合：
 
 ```bash
+GITHUB_ACCOUNT="hase62"
 mkdir -p ~/src
 cd ~/src
-gh repo clone <GitHubAccount>/research-dev-infra
+gh repo clone "$GITHUB_ACCOUNT/research-dev-infra"
 cd research-dev-infra
 ```
 
@@ -128,8 +129,9 @@ API定額プランを使う場合、通常は `OPENAI_API_KEY` と `ANTHROPIC_AP
 ## 9. 既存project
 
 ```bash
+GITHUB_ACCOUNT="hase62"
 cd ~/src
-gh repo clone <GitHubAccount>/Sepsis.Atlas
+gh repo clone "$GITHUB_ACCOUNT/Sepsis.Atlas"
 cd Sepsis.Atlas
 
 setup-project-links
@@ -146,4 +148,4 @@ link_data "/Volumes/ExternalSSD/SepsisAtlas/data" local_data
 use_output_dir "/Volumes/ExternalSSD/SepsisAtlas/results/$WORKSPACE_NAME"
 ```
 
-MacとWSL2で同じbranchを同時編集しません。移動前にcommit/pushし、移動後にpullします。
+別PCで進行中taskを続ける場合は、移動元でcheckpoint commitをpushし、移動先で同じtask名の`new-worktree`を実行します。worktree folder自体はPC間で同期しません。詳細は[worktree運用](WORKTREES.md)を参照してください。
