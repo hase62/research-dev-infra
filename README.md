@@ -1,78 +1,47 @@
 # research-dev-infra
 
-WSL2またはmacOS、GitHub、Visual Studio Code、Emacs、Codex、Claude Code、Miniforge、既存Dropboxデータを併用し、複数の研究プロジェクトをできるだけ簡単に開始・継続するための共通基盤です。
+WSL2またはmacOS上で、GitHub、Dropbox、VS Code、Emacs、Codex、Claude Code、Miniforgeを組み合わせて研究開発を行うための共通基盤です。
 
-このREADMEを、**新しいWSL2 PCまたはMacを、最初の解析を開始できる状態にするまでの標準手順書**として使用します。
+このREADMEは、**新しい端末を研究開発に使える状態へする手順**と、**projectを開始・再開する日常手順**だけをまとめています。1台目と2台目以降で手順を分けません。どの端末でも同じmachine setupを行い、既存projectならcloneして環境とlocal linkを再構築します。
+
+詳細な補足は [`docs/`](docs/) に分離しています。
 
 ---
 
-## 1. この仕組みの基本方針
+## 1. 基本方針
 
-- 研究プロジェクトごとにGitHub repositoryを分ける。
-- Git repositoryはDropbox外の `~/src/` に置く。
+- 研究projectごとにGitHub repositoryを分ける。
+- Git working treeはDropbox外の `~/src/` に置く。
 - Dropboxの既存構造は変更しない。
-- 必要なDropboxまたはローカルデータだけを、各projectの `.local/data/` にsymlinkする。
-- 大規模データ本体や解析中の出力はGitHubへ入れない。
-- Visual Studio Codeを共通の編集、Git差分確認、統合terminal、notebook実行の画面として使う。
-- Emacsはterminal editorとして併用できる。
-- CodexとClaude Codeは両方を導入し、対象project repositoryまたは専用worktreeの中から起動する。
-- どちらかの定額プランの利用上限に達したら、同じtask worktreeで停止し、もう一方へ順次切り替える。
+- 必要なデータだけ各projectの `.local/data/` にsymlinkする。
+- 大規模データ、秘密情報、解析中の出力はGitHubへ入れない。
+- CodexとClaude Codeはproject repositoryまたは専用worktreeの中から起動する。
 - 同じworking treeをCodexとClaude Codeに同時編集させない。
-- PC/Mac固有の設定は `~/.research_env` と `.local/` に閉じ込める。
-- 新規project開始時にYAMLや複雑なデータカタログは要求しない。
+- 端末固有の設定は `~/.research_env` とprojectの `.local/` に閉じ込める。
+- 解析環境はprojectごとに再構築可能な形で管理する。
 
-WSL2ではGit working treeをLinux filesystemの `~/src/` に置き、Windows版VS CodeからWSL extensionを介して開きます。macOSでは同じく `~/src/` にcloneし、Mac版VS CodeまたはEmacsで直接開きます。どちらの場合もコードをDropbox直下へ置きません。
-
-この手順でいう「Visual Studio」は **Visual Studio Code** を指します。Windows向けのフルIDEであるVisual Studioは、この構成の前提にはしていません。
+WSL2ではrepositoryをLinux filesystemの `~/src/` に置き、Windows版VS CodeからWSL extension経由で開きます。macOSでは `~/src/` に直接cloneし、Mac版VS CodeまたはEmacsで開きます。
 
 ---
 
-## 2. 作成される全体構成
-
-WSL2とmacOSで論理構成を揃えます。
+## 2. 作成される構成
 
 ```text
 ~
 ├── src/
 │   ├── research-dev-infra/
 │   ├── Sepsis.Atlas/
-│   ├── ProteomicAging/
 │   └── OtherProject/
-│
 ├── worktrees/
-│   ├── Sepsis.Atlas/
-│   ├── ProteomicAging/
-│   └── OtherProject/
-│
+│   └── <Project>/<workspace>/
 ├── scratch/
-│   ├── Sepsis.Atlas/
-│   ├── ProteomicAging/
-│   └── OtherProject/
-│
+│   └── <Project>/<workspace>/{scratch,output}
 └── data-roots/
-    ├── Research
-    │   -> Dropbox/Research
-    └── ForShareLargeData
-        -> Dropbox/ForShareLargeData
+    ├── Research -> Dropbox/Research
+    └── ForShareLargeData -> Dropbox/ForShareLargeData
 ```
 
-実体パスはOSごとに異なります。
-
-```text
-WSL2:
-  /mnt/c/Users/<WindowsUser>/Dropbox/Research
-  /mnt/c/Users/<WindowsUser>/Dropbox/ForShareLargeData
-
-macOS File Provider:
-  ~/Library/CloudStorage/Dropbox/Research
-  ~/Library/CloudStorage/Dropbox/ForShareLargeData
-```
-
-Dropbox名にチーム名やアカウント名が付く場合は、`setup-machine.sh --dropbox-home PATH`で実際のDropbox rootを指定します。
-
-PC全体で共通の大容量ローカルディスクは定義しません。必要なprojectだけが、WSL2なら任意の `/mnt/d/...` や `/mnt/e/...`、macOSなら `/Volumes/<Disk>/...` などを直接参照します。
-
-各projectは次の最小構成を持ちます。
+各projectの最小構成：
 
 ```text
 ~/src/<Project>/
@@ -80,651 +49,79 @@ PC全体で共通の大容量ローカルディスクは定義しません。必
 ├── AGENTS.md
 ├── CLAUDE.md
 ├── README.md
-├── .vscode/
-│   └── extensions.json
+├── .vscode/extensions.json
 ├── analysis/
 ├── docs/
 ├── tasks/
 ├── tests/
-├── handoffs/
-│   └── CURRENT.md
-├── scripts/
-│   └── setup-local-links.sh
+├── handoffs/CURRENT.md
+├── scripts/setup-local-links.sh
 └── .local/                 # Git管理しない
-    ├── data/               # 必要な入力データへのsymlink
-    ├── scratch/            # task用一時領域
-    └── output/             # task用working output
+    ├── data/
+    ├── scratch/
+    └── output/
 ```
 
-標準ではscratchとoutputは `~/scratch/<Project>/<Workspace>/` 以下です。外部ディスクへ置きたいprojectだけ `use_output_dir` で差し替えます。
+標準ではscratchとoutputを `~/scratch/<Project>/<Workspace>/` に置きます。project固有の外付けSSDや大容量diskを使う場合だけ、`scripts/setup-local-links.sh` で個別に指定します。
 
 ---
 
-# Part I. 1台目のPC：WSL2導入後から環境を作る
+# 3. 新しい端末のセットアップ
 
-## 3. Ubuntuを開き、infraをWSL2内へ置く
+以下は1台目でも追加端末でも共通です。違うのはOS別bootstrapとDropboxの実パスだけです。
 
-Windows側でこのrepositoryのZIPをダウンロードした場合、例えば次に置きます。
+## 3.1 infraを端末へ置く
 
-```text
-C:\Users\<WindowsUser>\Downloads\research-dev-infra.zip
-```
-
-Ubuntuを開きます。
+すでにGitHub CLIまたはGit認証が使える場合：
 
 ```bash
-sudo apt-get update
-sudo apt-get install -y unzip
-
 mkdir -p ~/src
 cd ~/src
-
-unzip "/mnt/c/Users/<WindowsUser>/Downloads/research-dev-infra.zip"
+gh repo clone hase62/research-dev-infra
 cd research-dev-infra
 ```
 
-現在位置を確認します。
-
-```bash
-pwd
-```
-
-次のようになっていれば正しい状態です。
+まだGitHub CLIを使えない場合は、GitHubのWeb画面からrepository ZIPをダウンロードし、次の位置へ展開します。
 
 ```text
-/home/<user>/src/research-dev-infra
+~/src/research-dev-infra
 ```
+
+bootstrapとGitHub認証の完了後、ZIP版はGit clone版へ置き換えます。
 
 ---
 
-## 4. Ubuntu基本ツールとGitHub CLIを導入する
+## 3.2 OS別bootstrap
 
-GitHubに登録している氏名とメールアドレスを指定します。
+### Windows / WSL2
+
+前提：Windows 11、WSL2、Ubuntuが導入済みであること。
+
+Ubuntu terminalで実行します。
 
 ```bash
+cd ~/src/research-dev-infra
+
 bash scripts/bootstrap-ubuntu.sh \
   --git-name "Takanori Hasegawa" \
   --git-email "GitHubに登録しているメールアドレス"
 ```
 
-途中で次の確認が出ます。
-
-```text
-Type BOOTSTRAP to continue:
-```
-
-次を入力します。
+確認時は次を入力します。
 
 ```text
 BOOTSTRAP
 ```
 
-導入される主なツールは次のとおりです。
+### macOS
 
-- Git
-- GitHub CLI (`gh`)
-- curl / wget
-- unzip / zip
-- rsync
-- jq
-- ripgrep
-- tmux
-- shellcheck
-- build-essential
-
-確認します。
-
-```bash
-git --version
-gh --version
-git config --global --list
-```
-
-メールアドレスをGitHub上で非公開にしたい場合は、GitHubが提供する `noreply` アドレスを `user.email` に設定しても構いません。
-
----
-
-## 5. GitHub CLIでログインする
-
-```bash
-gh auth login
-```
-
-通常は次を選択します。
-
-```text
-GitHub.com
-HTTPS
-Login with a web browser
-```
-
-認証後、Gitのcredential helperも設定します。
-
-```bash
-gh auth setup-git
-gh auth status
-gh api user --jq '.login'
-```
-
-最後のコマンドで自分のGitHubユーザー名が表示されれば正常です。
-
-### 古いpersonal access tokenが認証を上書きしていないか
-
-`GH_TOKEN`または`GITHUB_TOKEN`が設定されていると、保存済みのブラウザ認証より優先されます。
-
-```bash
-[ -n "${GH_TOKEN:-}" ] && echo "GH_TOKEN is set"
-[ -n "${GITHUB_TOKEN:-}" ] && echo "GITHUB_TOKEN is set"
-```
-
-表示された場合は現在のshellから外します。
-
-```bash
-unset GH_TOKEN GITHUB_TOKEN
-```
-
-設定ファイルに残っていないか確認します。token本体を表示するコマンドは使いません。
-
-```bash
-grep -nE 'GH_TOKEN|GITHUB_TOKEN' \
-  ~/.bashrc ~/.profile ~/.research_env 2>/dev/null
-```
-
-不要な設定行があれば削除して、ブラウザ認証をやり直します。
-
-```bash
-gh auth logout --hostname github.com
-
-gh auth login \
-  --hostname github.com \
-  --web \
-  --git-protocol https
-
-gh auth setup-git
-gh auth status
-```
-
----
-
-## 6. research-dev-infra自体をprivate GitHub repositoryへ登録する
-
-```bash
-cd ~/src/research-dev-infra
-
-git init -b main
-git add .
-git commit -m "Initialize research development infrastructure"
-
-gh repo create research-dev-infra \
-  --private \
-  --source=. \
-  --remote=origin \
-  --push
-```
-
-確認します。
-
-```bash
-git remote -v
-git status
-git branch -vv
-```
-
-正常な例：
-
-```text
-origin  https://github.com/<account>/research-dev-infra.git (fetch)
-origin  https://github.com/<account>/research-dev-infra.git (push)
-On branch main
-Your branch is up to date with 'origin/main'.
-nothing to commit, working tree clean
-```
-
-### `Resource not accessible by personal access token (createRepository)`
-
-現在使われているtokenにrepository作成権限がありません。
-
-前節の手順で `GH_TOKEN` / `GITHUB_TOKEN` を解除し、`gh auth login --web`をやり直してください。ローカルのcommitは既に成功しているため、`git init`や`git commit`をやり直す必要はありません。認証修正後、`gh repo create ...`だけを再実行します。
-
-### `gh repo view --web`でブラウザが開かない
-
-repository作成やpushの失敗ではありません。WSL2内にURLを開くhelperがないだけです。
-
-Windowsのブラウザで開くには次を使えます。
-
-```bash
-explorer.exe "$(gh repo view --json url --jq '.url')"
-```
-
-またはURLだけ表示します。
-
-```bash
-gh repo view --json url --jq '.url'
-```
-
----
-
-## 7. Dropboxの共通参照ルートを設定する
-
-本構成は、Dropbox内の次の2ルートを既存構造のまま参照します。
-
-```text
-C:\Users\<WindowsUser>\Dropbox\Research
-C:\Users\<WindowsUser>\Dropbox\ForShareLargeData
-```
-
-マシン設定を実行します。
-
-```bash
-cd ~/src/research-dev-infra
-bash scripts/setup-machine.sh
-source ~/.bashrc
-```
-
-Windowsユーザー名やDropbox位置を自動検出できない場合：
-
-```bash
-bash scripts/setup-machine.sh \
-  --windows-user <WindowsUser> \
-  --dropbox-home "/mnt/c/Users/<WindowsUser>/Dropbox"
-
-source ~/.bashrc
-```
-
-確認します。
-
-```bash
-cat ~/.research_env
-ls -l ~/data-roots
-research-doctor
-```
-
-`~/.research_env`はPC固有ファイルです。GitHubやDropboxで同期しません。
-
-`setup-machine.sh`はローカルSSDや外付けディスクを作成・登録しません。それらはprojectごとに必要性も場所も異なるため、各projectの `scripts/setup-local-links.sh` で直接指定します。
-
----
-
-## 8. Visual Studio CodeをWindowsへ導入する
-
-このworkflowでは、**Windows版Visual Studio Codeを画面として使い、処理はWSL2内で実行**します。VS Code本体をUbuntuへaptで入れません。
-
-Windows PowerShellで次を実行します。新規導入の場合：
-
-```powershell
-winget install --id Microsoft.VisualStudioCode -e
-```
-
-既に導入済みの場合は、拡張機能との互換性問題を避けるため更新します。
-
-```powershell
-winget upgrade --id Microsoft.VisualStudioCode -e
-```
-
-VS Codeを更新した後は、開いているVS Code windowをすべて閉じ、Windows PowerShellでWSLを停止します。
-
-```powershell
-wsl --shutdown
-```
-
-Ubuntuを開き直し、確認します。
-
-```bash
-code --version
-```
-
-このinfraの `setup-vscode` は、現在のClaude Code extensionが要求する **VS Code 1.98.0以上**を共通の最低条件として検査します。1.98.0未満なら、extensionの導入を始めずに更新手順を表示して停止します。
-
-続いて、公式のWSL、Codex、Claude Codeと、解析用のPython、Jupyter、R extensionを導入します。
-
-`setup-vscode`は`setup-machine.sh`が`~/.local/bin/`へ登録するcommandです。infraを更新して`setup-vscode.sh`が新しく追加された場合は、先に`setup-machine.sh`をもう一度実行してcommandを再登録します。再実行してもDropboxや既存projectの内容は変更されません。
-
-```bash
-cd ~/src/research-dev-infra
-
-bash scripts/setup-machine.sh
-
-source ~/.bashrc
-hash -r
-command -v setup-vscode
-setup-vscode
-```
-
-command登録前でも、scriptを直接実行できます。
-
-```bash
-cd ~/src/research-dev-infra
-bash scripts/setup-vscode.sh
-```
-
-確認文字列を求められたら、内容を確認して次を入力します。
-
-```text
-VSCODE
-```
-
-導入対象は次です。
-
-- Microsoft WSL
-- OpenAI Codex
-- Anthropic Claude Code
-- Microsoft Python
-- Microsoft Jupyter
-- R extension
-
-infra repositoryをVS Codeで開きます。
-
-```bash
-cd ~/src/research-dev-infra
-code .
-```
-
-VS Codeの左下に `WSL: Ubuntu` などの表示が出ていれば、Windows上のVS CodeがWSL2内のrepositoryとLinux toolchainを使用しています。以後、projectもWSL terminalで対象directoryへ移動してから `code .` で開きます。
-
-### `code: command not found`
-
-まずWindows側にVisual Studio Codeが入っていることを確認します。その後、Windows版VS CodeのExtensions画面でMicrosoftの `WSL` extensionを入れ、Command Paletteから `WSL: Connect to WSL` を一度実行してください。Ubuntuを開き直してから再確認します。
-
-```bash
-code --version
-setup-vscode
-```
-
-CodexとClaude CodeのVS Code extensionおよびCLIは、それぞれ別のサービス、認証、利用上限を持ちます。このinfraは残量を自動判定しません。一方が利用上限を通知したら、同じworktreeでそのsessionを停止し、もう一方へ手動で切り替えます。
-
-
-### Emacsを併用する
-
-VS Codeに加えて、WSL2 terminal内のeditorとしてEmacsを使用できます。標準ではGUI依存のない `emacs-nox` を導入します。
-
-```bash
-setup-emacs
-```
-
-確認文字列を求められたら次を入力します。
-
-```text
-EMACS
-```
-
-利用例：
-
-```bash
-cd ~/src/research-dev-infra
-e README.md
-```
-
-または：
-
-```bash
-emacs -nw README.md
-```
-
-Windows 11のWSLgでGUI版を使う場合だけ、次を使用します。
-
-```bash
-setup-emacs --gui
-```
-
-VS CodeとEmacsは同じrepositoryで併用できます。ただし、同じfileを両方で同時編集しません。CodexとClaude Codeは、どちらのeditorを使う場合も対象projectまたはworktreeのterminalから起動します。
-
----
-
-## 9. Miniforgeを導入する
-
-```bash
-install-miniforge
-source ~/.bashrc
-```
-
-確認します。
-
-```bash
-conda --version
-mamba --version
-conda config --show auto_activate_base
-```
-
-次の状態が想定されます。
-
-```text
-auto_activate_base: false
-```
-
-研究用packageはbase環境へ直接追加せず、原則としてprojectごとに環境を分けます。
-
----
-
-## 10. CodexとClaude Codeを導入する
-
-```bash
-install-coding-agents
-source ~/.bashrc
-```
-
-途中で次が表示されたら、確認後に入力します。
-
-```text
-Type INSTALL to continue:
-```
-
-```text
-INSTALL
-```
-
-確認します。
-
-```bash
-codex --version
-claude --version
-```
-
-CodexとClaude Codeは両方を常時導入しておきます。通常はその時点で使いやすい方から開始し、定額プランの利用上限に達したら同じtask worktreeで別のagentへ切り替えます。両者を同じworking treeで同時実行してはいけません。
-
-CLIはVS Codeの統合terminalから起動できます。VS Code extensionを使う場合も、同じrepositoryまたはworktreeを開き、同時編集を避けるという原則は同じです。
-
-現在の `scripts/install-agents.sh` は、Codex installerを非対話モードで実行するため、installer内からCodexを自動起動しません。インストール後のCodexとClaude Codeは、実際の研究repositoryに移動してから手動で起動します。
-
-
-### WSL2上でログインする
-
-定額プランを使用する場合はAPI keyではなく、各サービスのbrowser認証を使用します。まずAPI keyがshellへ設定されていないことを確認します。
-
-```bash
-[[ -n "${OPENAI_API_KEY:-}" ]] && echo "OPENAI_API_KEY is set" || echo "OPENAI_API_KEY is not set"
-[[ -n "${ANTHROPIC_API_KEY:-}" ]] && echo "ANTHROPIC_API_KEY is set" || echo "ANTHROPIC_API_KEY is not set"
-```
-
-Codex：
-
-```bash
-codex login
-```
-
-表示された認証画面で `Sign in with ChatGPT` を選び、ChatGPT Businessで使用するaccountとworkspaceへログインします。browserが自動で開かない場合は、表示されたURLをWindows側browserで開きます。
-
-Claude Code：
-
-```bash
-claude
-```
-
-初回認証でClaude ProまたはMaxを契約しているClaude accountへログインします。認証状態はClaude Code内の `/status` で確認します。
-
-### 研究計算用の標準modelとeffortを設定する
-
-このinfraでは、新しいsessionの標準を次に固定します。
-
-```text
-Codex       gpt-5.6   xhigh
-Codex Plan  gpt-5.6   xhigh
-Claude Code opus      xhigh、stable channel
-```
-
-Claude Codeはstable channelを維持し、`opus`エイリアスを使用します。現時点ではstable channelで利用可能な最新のOpus 4系列を使用し、将来Opus 5がstableへ入った時点で、同じ`opus`設定のまま移行します。
-
-標準設定を反映します。
-
-```bash
-setup-agent-defaults
-```
-
-確認文字列を求められたら次を入力します。
-
-```text
-AGENTS
-```
-
-`setup-agent-defaults`は既存設定をtimestamp付きでbackupしたうえで、次を設定・検証します。
-
-Codex `~/.codex/config.toml`：
-
-```toml
-model = "gpt-5.6"
-model_reasoning_effort = "xhigh"
-plan_mode_reasoning_effort = "xhigh"
-```
-
-Claude Code `~/.claude/settings.json`：
-
-```json
-{
-  "autoUpdatesChannel": "stable",
-  "model": "opus",
-  "effortLevel": "xhigh"
-}
-```
-
-設定後は、既存sessionを再開せず、新しいsessionを起動して確認します。
-
-Codex：
-
-```bash
-codex
-```
-
-Codex内：
-
-```text
-/status
-```
-
-Claude Code：
-
-```bash
-claude
-```
-
-Claude Code内：
-
-```text
-/status
-/model
-/effort
-```
-
-Claude Codeの`--resume`または`--continue`は、保存時に使用していたmodelを維持します。最初の確認では使用しません。
-
-一時的に`max`を使う場合は、persistent defaultを変更せずsession単位で指定します。
-
-```bash
-claude --model opus --effort max
-```
-
-Codexはsession中の`/model`から一時的にeffortを変更します。
-
-環境変数`ANTHROPIC_MODEL`または`CLAUDE_CODE_EFFORT_LEVEL`が設定されている場合、Claude Codeのuser settingsより優先されます。確認します。
-
-```bash
-[[ -n "${ANTHROPIC_MODEL:-}" ]] && echo "ANTHROPIC_MODEL is set"
-[[ -n "${CLAUDE_CODE_EFFORT_LEVEL:-}" ]] && echo "CLAUDE_CODE_EFFORT_LEVEL is set"
-```
-
-通常は両方とも何も表示されない状態にします。
-
-### 古いscriptで `Start Codex now? [y/N]` に `y` と答えた場合
-
-Codex installerが次のように動いたことがあります。
-
-```text
-Start Codex now? [y/N] y
-==> Launching Codex
-<通常のbash promptへ即座に戻る>
-```
-
-これはCodexのインストール失敗ではありません。installer自体が `curl | sh` のパイプ内で実行され、そこから起動された対話CLIがキーボード用の標準入力を利用できず、すぐ終了した可能性があります。
-
-次のような表示に戻っていれば、現在はCodex画面ではなく通常のUbuntu bashです。
-
-```text
-<user>@<computer>:~/src/research-dev-infra$
-```
-
-Codex画面に入っている場合は、通常の `$` 付きbash promptは表示されません。
-
-古いinstaller呼び出しで処理が途中終了し、Claude Codeだけ入っていない場合：
-
-```bash
-curl -fsSL https://claude.ai/install.sh | bash -s stable
-hash -r
-claude --version
-```
-
-infraを最新版へ更新した後、`install-coding-agents`を再実行しても構いません。
-
----
-
-## 11. マシン全体を診断する
-
-```bash
-research-doctor
-```
-
-主に次を確認します。
-
-- WSL2上で動作しているか
-- Git / curl / bash
-- GitHub CLIの認証
-- Dropboxの2ルート
-- `~/src` / `~/worktrees` / `~/scratch`
-- Miniforge / conda / mamba
-- Codex / Claude Code
-- VS Code CLI（未導入ならwarningのみ）
-
-任意ツールがない場合はwarningになります。`Failures: 0`なら基盤としては利用可能です。
-
----
-
-# Part I-B. Macを開発端末として追加する
-
-MacではWSL2を使いません。macOSのUnix環境へ直接repositoryをcloneし、Windows/WSL2と同じGitHub branch、Dropboxデータ、worktree運用を使用します。GPU PyTorchやCUDAを必要とする計算はWindows GPU、HPC、TSUBAME、Shirokaneなどへ残し、Macはコード開発、軽量解析、R/Python処理、ドキュメント、レビューに使用します。
-
-## 11A. macOSの前提
-
-- macOS 13以降を推奨する。
-- Apple SiliconとIntel Macの両方に対応する。
-- Dropbox desktop appへ同じアカウントでログインしておく。
-- 解析に使うDropboxファイルは「オンラインのみ」ではなく、Macへダウンロード済みにする。
-- repositoryはDropboxではなく `~/src/` に置く。
-
-Apple Command Line Toolsを導入します。
+最初にApple Command Line Toolsを入れます。
 
 ```bash
 xcode-select --install
 ```
 
-installer完了後、Terminalでinfraをcloneします。GitHub CLIがまだない最初のMacでは、先にGitHubのWeb画面からZIPを取得して `~/src/research-dev-infra` へ展開しても構いません。
-
-```bash
-mkdir -p ~/src
-cd ~/src
-git clone https://github.com/<GitHubAccount>/research-dev-infra.git
-cd research-dev-infra
-```
-
-private repositoryをHTTPS cloneできない段階では、ZIPからbootstrapを開始し、GitHub CLI認証後にclone版へ置き換えます。
-
-## 11B. Homebrewと基本ツールを導入する
+installer完了後：
 
 ```bash
 cd ~/src/research-dev-infra
@@ -734,7 +131,7 @@ bash scripts/bootstrap-macos.sh \
   --git-email "GitHubに登録しているメールアドレス"
 ```
 
-Visual Studio CodeとDropboxもHomebrewから導入する場合：
+VS CodeとDropboxもHomebrewから入れる場合：
 
 ```bash
 bash scripts/bootstrap-macos.sh \
@@ -743,29 +140,103 @@ bash scripts/bootstrap-macos.sh \
   --desktop-apps
 ```
 
-bootstrap後は新しいTerminalを開くか、次を実行します。
+確認時は次を入力します。
+
+```text
+BOOTSTRAP
+```
+
+bootstrap後：
 
 ```bash
 source ~/.zprofile
 ```
 
-GitHubへログインします。
+---
+
+## 3.3 GitHubへログインする
+
+両OS共通です。
 
 ```bash
 gh auth login
 gh auth setup-git
 gh auth status
+gh api user --jq '.login'
 ```
 
-## 11C. Mac版Dropbox rootを設定する
-
-Dropbox on File Providerでは通常、Dropboxは次の下にあります。
+通常は次を選びます。
 
 ```text
-~/Library/CloudStorage/Dropbox
+GitHub.com
+HTTPS
+Login with a web browser
 ```
 
-実際の候補を確認します。
+`GH_TOKEN`または`GITHUB_TOKEN`が古い認証を上書きしていないか確認します。
+
+```bash
+[ -n "${GH_TOKEN:-}" ] && echo "GH_TOKEN is set"
+[ -n "${GITHUB_TOKEN:-}" ] && echo "GITHUB_TOKEN is set"
+```
+
+ZIPからbootstrapした場合は、認証後にclone版へ置き換えます。
+
+```bash
+cd ~/src
+mv research-dev-infra research-dev-infra-from-zip
+
+gh repo clone hase62/research-dev-infra
+cd research-dev-infra
+```
+
+新しいcloneが正常であることを確認してからZIP版を削除します。
+
+---
+
+## 3.4 Dropboxと共通commandを設定する
+
+Dropboxには次のdirectoryが既に存在する前提です。
+
+```text
+Research
+ForShareLargeData
+```
+
+### WSL2
+
+通常はWindows userとDropbox pathを自動検出できます。
+
+```bash
+cd ~/src/research-dev-infra
+bash scripts/setup-machine.sh
+source ~/.bashrc
+hash -r
+```
+
+自動検出できない場合：
+
+```bash
+bash scripts/setup-machine.sh \
+  --dropbox-home "/mnt/c/Users/<WindowsUser>/Dropbox"
+```
+
+### macOS
+
+Dropbox File Provider環境では、通常は次の配下から自動検出します。
+
+```text
+~/Library/CloudStorage/Dropbox*
+```
+
+```bash
+cd ~/src/research-dev-infra
+bash scripts/setup-machine.sh
+source ~/.zshrc
+hash -r
+```
+
+自動検出できない場合は候補を確認します。
 
 ```bash
 find "$HOME/Library/CloudStorage" \
@@ -775,455 +246,371 @@ find "$HOME/Library/CloudStorage" \
   -print
 ```
 
-`Research`と`ForShareLargeData`が通常のDropbox root直下にあれば、自動検出できます。
-
-```bash
-cd ~/src/research-dev-infra
-bash scripts/setup-machine.sh
-source ~/.zshrc
-hash -r
-```
-
-チーム名付きDropboxなどで自動検出できない場合：
+実際のrootを指定します。
 
 ```bash
 bash scripts/setup-machine.sh \
-  --dropbox-home "$HOME/Library/CloudStorage/Dropbox <実際の名称>"
+  --dropbox-home "$HOME/Library/CloudStorage/<実際のDropbox名>"
 ```
 
-確認します。
+### 共通確認
 
 ```bash
 ls -ld ~/data-roots/Research
 ls -ld ~/data-roots/ForShareLargeData
-research-doctor
+command -v research-doctor
 ```
 
-## 11D. Mac版VS Codeを設定する
-
-まだ導入していない場合：
-
-```bash
-brew install --cask visual-studio-code
-```
-
-VS Codeを一度開き、Command Paletteから次を実行します。
+`setup-machine.sh`は次を作成します。
 
 ```text
-Shell Command: Install 'code' command in PATH
+~/.research_env
+~/.local/bin/new-project
+~/.local/bin/new-worktree
+~/.local/bin/remove-worktree
+~/.local/bin/setup-project-links
+~/.local/bin/research-doctor
+~/.local/bin/install-coding-agents
+~/.local/bin/install-miniforge
+~/.local/bin/setup-vscode
+~/.local/bin/setup-agent-defaults
+~/.local/bin/setup-emacs
+~/.local/bin/analysis-smoke-test
 ```
 
-新しいTerminalを開いて確認します。
+infraに新しいcommandが追加された場合は、pull後に `bash scripts/setup-machine.sh` を再実行します。
+
+---
+
+## 3.5 VS Code、Miniforge、Agent、Emacsを導入する
+
+### VS Code
+
+WSL2ではWindows側へVS Codeを導入し、Ubuntu terminalから次を実行します。macOSではMac版VS Codeを導入してから同じcommandを使います。
 
 ```bash
-code --version
 setup-vscode
 ```
 
-MacではWSL extensionを入れません。Codex、Claude Code、Python、Jupyter、Rのextensionだけを導入します。
+WSL2ではRemote - WSLを含み、macOSではWSL extensionを除外して必要なextensionを導入します。
 
-## 11E. MacへMiniforge、Codex、Claude Code、Emacsを導入する
+### Miniforge
 
 ```bash
 install-miniforge
-source ~/.zshrc
+```
 
+Shellを読み直します。
+
+```bash
+# WSL2
+source ~/.bashrc
+
+# macOS
+source ~/.zshrc
+```
+
+### CodexとClaude Code
+
+```bash
 install-coding-agents
-source ~/.zshrc
+```
 
+Shellを読み直し、versionを確認します。
+
+```bash
+codex --version
+claude --version
+```
+
+### 研究計算用の標準model設定
+
+```bash
 setup-agent-defaults
+```
+
+確認時は次を入力します。
+
+```text
+AGENTS
+```
+
+標準設定：
+
+```text
+Codex
+  model: gpt-5.6
+  reasoning effort: xhigh
+  Plan Mode effort: xhigh
+
+Claude Code
+  update channel: stable
+  model: opus
+  effort: xhigh
+```
+
+実際の設定ファイル：
+
+```text
+~/.codex/config.toml
+~/.claude/settings.json
+```
+
+Claude Codeは当面stable channelで利用可能なOpus 4系列を使い、stable版がOpus 5に対応した段階で `opus` aliasから移行します。
+
+### Emacs
+
+terminal版：
+
+```bash
 setup-emacs
 ```
 
-GUI版Emacsも追加する場合：
+確認時は次を入力します。
+
+```text
+EMACS
+```
+
+使用例：
+
+```bash
+e PROJECT.md
+emacs -nw PROJECT.md
+```
+
+GUI版も導入する場合：
 
 ```bash
 setup-emacs --gui
 ```
 
-標準設定は両OSで同じです。
+---
 
-```text
-Codex       gpt-5.6   xhigh
-Codex Plan  gpt-5.6   xhigh
-Claude Code opus      xhigh、stable channel
-```
+## 3.6 CodexとClaude Codeへログインする
 
-CodexとClaude CodeはMacでも個別にログインします。認証情報をGitHubやDropboxで同期しません。
+認証は端末ごとに行います。credentialをGitHubやDropboxで同期しません。
+
+### Codex
 
 ```bash
 codex login
+```
+
+ChatGPT Businessアカウントを使います。
+
+### Claude Code
+
+```bash
 claude
 ```
 
-最終確認：
+Claude Code内でログインし、状態を確認します。
+
+```text
+/status
+/model
+/effort
+```
+
+subscription利用時は、意図せずAPI billingへ切り替わらないよう環境変数を確認します。
+
+```bash
+[[ -n "${OPENAI_API_KEY:-}" ]] && echo "OPENAI_API_KEY is set"
+[[ -n "${ANTHROPIC_API_KEY:-}" ]] && echo "ANTHROPIC_API_KEY is set"
+```
+
+---
+
+## 3.7 machine診断
 
 ```bash
 research-doctor
 ```
 
-## 11F. Macで既存projectを開始する
+`Failures: 0`なら基盤として使用できます。VS Code、R、Emacsなど未使用の任意toolはwarningでも構いません。
+
+---
+
+# 4. Projectを開始または再開する
+
+## 4.1 新規projectを作る
+
+```bash
+new-project Sepsis.Atlas --github
+cd ~/src/Sepsis.Atlas
+```
+
+次を編集します。
+
+```text
+PROJECT.md
+scripts/setup-local-links.sh
+```
+
+その後：
+
+```bash
+setup-project-links
+research-doctor Sepsis.Atlas
+```
+
+GitHub repositoryを後から接続する場合は、`--github`を付けずに作成します。
+
+---
+
+## 4.2 既存projectを別端末で再開する
+
+端末が1台目か2台目かは関係ありません。既存repositoryをcloneし、端末固有部分だけ再構築します。
 
 ```bash
 cd ~/src
-gh repo clone <GitHubAccount>/Sepsis.Atlas
+gh repo clone hase62/Sepsis.Atlas
 cd Sepsis.Atlas
 
 setup-project-links
+research-doctor Sepsis.Atlas
+```
+
+project環境を再作成します。
+
+```bash
 mamba env create -f environment.yml
 conda activate sepsis-atlas
 analysis-smoke-test Sepsis.Atlas
-code .
 ```
 
-Mac固有のデータや外付けSSDが必要な場合だけ、projectの `scripts/setup-local-links.sh` へ追加します。
+追加端末で作り直すもの：
+
+- Codex／Claude Codeのログイン
+- Miniforge環境
+- `~/.research_env`
+- Dropbox rootへのsymlink
+- projectの `.local/`
+
+GitHubまたはDropboxで同期しないもの：
+
+- credential
+- conda環境本体
+- `.local/`
+- scratch/output
+
+---
+
+# 5. データlinkを設定する
+
+projectの `scripts/setup-local-links.sh` に、必要なデータだけ記述します。
+
+Dropbox例：
 
 ```bash
+link_data "$RESEARCH_ROOT/Sepsis/metadata" metadata
+link_data "$LARGE_ROOT/Sepsis/processed" processed
+```
+
+project固有local disk例：
+
+```bash
+# WSL2
+link_data "/mnt/e/SepsisAtlas/data" local_data
+use_output_dir "/mnt/e/SepsisAtlas/results/$WORKSPACE_NAME"
+
+# macOS
 link_data "/Volumes/ExternalSSD/SepsisAtlas/data" local_data
 use_output_dir "/Volumes/ExternalSSD/SepsisAtlas/results/$WORKSPACE_NAME"
 ```
 
-WSL2とMacで同じbranchを同時編集しません。端末を移る前にcommit/pushし、別端末でpullして再開します。
-
----
-
-# Part II. 最初の研究projectを作る
-
-## 12. private GitHub repository付きでprojectを作る
-
-例として `ProteomicAging` を作ります。
-
-```bash
-new-project ProteomicAging --github
-cd ~/src/ProteomicAging
-```
-
-これにより次が作成されます。
-
-```text
-~/src/ProteomicAging
-~/worktrees/ProteomicAging
-~/scratch/ProteomicAging
-GitHub private repository: ProteomicAging
-```
-
-状態を確認します。
-
-```bash
-git status
-git remote -v
-git branch -vv
-```
-
-VS Codeで開きます。
-
-```bash
-code .
-```
-
-左下がWSL接続になっていることを確認し、以後の編集、terminal、Git差分確認をこのwindowで行います。
-
-GitHub repositoryをまだ作らない場合：
-
-```bash
-new-project ProteomicAging
-```
-
-後から接続できます。
-
-```bash
-cd ~/src/ProteomicAging
-
-gh repo create ProteomicAging \
-  --private \
-  --source=. \
-  --remote=origin \
-  --push
-```
-
----
-
-## 13. PROJECT.mdへ研究内容を書く
-
-```bash
-nano PROJECT.md
-```
-
-最初は数行で十分です。
-
-```markdown
-# ProteomicAging
-
-## Goal
-
-細胞種別プロテオミクスを用いて、加齢関連変化と細胞老化標的を解析する。
-
-## Current phase
-
-公開データの収集、入力形式の調査、再現解析環境の構築。
-```
-
-`PROJECT.md`はCodexとClaude Codeが最初に理解すべき研究文脈と、データアクセス規則をまとめる場所です。
-
-- `AGENTS.md`：Codex向けの入口
-- `CLAUDE.md`：Claude Code向けの入口
-- `PROJECT.md`：両者に共通する研究内容と必須ルール
-
-CodexとClaude Codeは、起動したrepositoryまたはworktreeの下を対象にします。親ディレクトリ、Dropbox root、別研究repositoryから起動しません。
-
----
-
-## 14. 必要なデータだけ `.local/data/` にリンクする
-
-```bash
-nano scripts/setup-local-links.sh
-```
-
-ファイル末尾のproject-specific sectionへ追加します。
-
-```bash
-link_data "$RESEARCH_ROOT/Papers/Aging/Proteomics" papers
-link_data "$LARGE_ROOT/Proteomics/PublicData" public_data
-```
-
-project固有のローカルSSDや外付けディスクが必要な場合は、その実パスを直接指定します。
-
-```bash
-link_data "/mnt/e/ProteomicAging/large_objects" large_objects
-```
-
-working outputも外部ディスクへ置きたいprojectだけ、次を追加します。
-
-```bash
-use_output_dir "/mnt/e/ProteomicAging/results/$WORKSPACE_NAME"
-```
-
-実際のDropbox構造に合わせて変更します。Dropbox内をprojectごとに再編成する必要はありません。
-
-リンクを作成します。
+反映：
 
 ```bash
 setup-project-links
 ```
 
-確認します。
+確認：
 
 ```bash
 find .local -maxdepth 2 -type l -print -exec readlink {} \;
-research-doctor ProteomicAging
 ```
 
-CodexとClaude Codeに見せる入力は `.local/data/` 以下にリンクした場所だけにします。
-
-`.local/`は `.gitignore` に含まれているため、symlink、データ、scratch、outputはGitHubへpushされません。
+AgentへDropbox全体やデータroot全体を見せず、必要なsubpathだけlinkします。
 
 ---
 
-# Part III. 解析環境を作る
+# 6. 解析環境を作る
 
-## 15. 原則：1 project 1環境から始める
+原則として1 project 1環境から始めます。
 
-環境を細かく分けすぎる必要はありません。まずproject用環境を1つ作り、依存関係が衝突した時だけ分割します。
-
-環境名はproject名を小文字のハイフン形式にすると扱いやすくなります。
-
-```text
-ProteomicAging -> proteomic-aging
-Sepsis.Atlas   -> sepsis-atlas
-```
-
-### Python中心の最小例
+Python中心：
 
 ```bash
-mamba create -n proteomic-aging \
-  -c conda-forge \
-  python=3.12 \
-  pip \
-  jupyterlab \
-  numpy \
-  pandas \
-  scipy \
-  matplotlib
+mamba create -n sepsis-atlas \
+  -c conda-forge -c bioconda \
+  python=3.12 pip jupyterlab numpy pandas scipy matplotlib \
+  scanpy anndata
 ```
 
-### RとPythonを併用する例
+RとPython併用：
 
 ```bash
-mamba create -n proteomic-aging \
-  -c conda-forge \
-  -c bioconda \
-  python=3.12 \
-  pip \
-  jupyterlab \
-  numpy \
-  pandas \
-  scipy \
-  matplotlib \
-  r-base \
-  r-irkernel \
-  r-data.table
+mamba create -n sepsis-atlas \
+  -c conda-forge -c bioconda \
+  python=3.12 pip jupyterlab numpy pandas scipy matplotlib \
+  scanpy anndata \
+  r-base r-irkernel r-data.table
 ```
 
-環境を有効化します。
-
 ```bash
-conda activate proteomic-aging
-```
-
-確認します。
-
-```bash
-which python
-python --version
-Rscript --version
-```
-
-Rを入れていない環境では `Rscript: command not found` でも問題ありません。
-
-### packageを追加する
-
-```bash
-mamba install -n proteomic-aging \
-  -c conda-forge \
-  -c bioconda \
-  scikit-learn pyarrow
-```
-
-可能な限り、最初から大量のpackageを入れず、解析に必要になったものを追加します。
-
----
-
-## 16. 環境定義をGitHubで管理する
-
-環境を有効化した状態で、明示的に指定した主要packageを保存します。
-
-```bash
+conda activate sepsis-atlas
 conda env export --from-history > environment.yml
 ```
 
-内容を確認します。
+OS間で再構築しやすいよう、通常は `--from-history` でexportします。Linuxの完全な解決済みpackage一覧をそのままApple Silicon Macへ再現しないでください。
+
+動作確認：
 
 ```bash
-cat environment.yml
+analysis-smoke-test Sepsis.Atlas
 ```
-
-commitします。
-
-```bash
-git add environment.yml
-git commit -m "Add initial analysis environment"
-git push
-```
-
-別PCでは次で再作成できます。
-
-```bash
-mamba env create -f environment.yml
-```
-
-環境名が既に存在する場合は更新します。
-
-```bash
-mamba env update -f environment.yml --prune
-```
-
-`environment.yml`だけで完全再現が不足する高度なprojectでは、後から `renv.lock`、`uv.lock`、container定義などを追加します。最初から全projectへ強制しません。
 
 ---
 
-## 17. 最初の動作確認を行う
+# 7. CodexまたはClaude Codeで作業する
 
-project rootで実行します。
-
-```bash
-cd ~/src/ProteomicAging
-conda activate proteomic-aging
-analysis-smoke-test ProteomicAging
-```
-
-このtestは次を確認します。
-
-- Git working treeが存在する
-- `.local/data/`が存在する
-- `.local/scratch/`が存在し書き込める
-- `.local/output/`が存在し書き込める
-- active environmentのPythonが実行できる
-- Rを入れた場合はRscriptが実行できる
-- `git status`が実行できる
-
-成功例の末尾：
-
-```text
-Failures: 0; warnings: 0
-```
-
-Rを入れていない場合などはwarningがあっても構いません。
-
-```text
-Failures: 0; warnings: 1
-```
-
-`Failures: 0`であれば解析開始可能です。
-
----
-
-# Part IV. VS CodeからCodexまたはClaude Codeで最初の解析を始める
-
-## 18. 必ず対象projectをVS Codeで開いてから起動する
-
-WSL terminalで対象projectへ移動し、VS Codeを開きます。
+必ず対象repositoryまたはworktreeへ移動してから起動します。
 
 ```bash
-cd ~/src/ProteomicAging
+cd ~/src/Sepsis.Atlas
 code .
 ```
 
-VS Codeの統合terminalを開き、解析環境を有効化します。
-
-```bash
-conda activate proteomic-aging
-```
-
-Codexから開始する場合：
+terminalから：
 
 ```bash
 codex
 ```
 
-Claude Codeから開始する場合：
+または：
 
 ```bash
 claude
 ```
 
-VS CodeのCodexまたはClaude Code panelを使っても構いません。最も単純で共通性が高い運用は、VS CodeをeditorとGit画面として使い、統合terminalからCLIを起動する方法です。
+Emacsを使う場合も、Agentは同じproject terminalから起動します。
 
-次の場所から起動してはいけません。
-
-```text
-~
-~/src
-~/data-roots
-DropboxのResearch root
-DropboxのForShareLargeData root
+```bash
+cd ~/src/Sepsis.Atlas
+e PROJECT.md
 ```
 
-Agentに見せるデータは `.local/data/` 以下に限定します。
+## Plan Mode
 
-
-### Plan Modeの標準的な使い方
-
-Plan Modeはmodelやeffortとは別の機能です。fileを編集する前にrepository、入力、既存実装を調査し、変更案を提示させるために使用します。
+Plan Modeは、変更前にrepositoryを調査し、実装計画を提示させるために使います。
 
 Codex：
 
-1. `codex`を起動する。
-2. `Shift+Tab`でPlan Modeへ切り替える。
-3. 目的、制約、検証条件を伝える。
-4. 提示されたplanを修正・承認する。
-5.通常modeへ戻し、承認したplanを実装させる。
-
-このinfraでは通常modeとPlan Modeの両方を `xhigh` に設定します。
+```text
+Shift+TabでPlan Modeへ切替
+```
 
 Claude Code：
 
@@ -1231,847 +618,243 @@ Claude Code：
 /plan
 ```
 
-または `Shift+Tab`でPlan Modeへ切り替えます。Claudeはfileを読み、非破壊的な調査commandを実行してplanを作りますが、planを承認するまでsourceを編集しません。
-
-最初からPlan Modeで起動する場合：
+または：
 
 ```bash
 claude --permission-mode plan
 ```
 
-`opusplan`はPlan Modeそのものではありません。Plan Mode中はOpus、実装時はSonnetへ自動切替するmodel aliasです。このinfraでは実装時も科学的判断を前提とするため、標準には `opus` を使用し、必要な時だけ `/plan` へ切り替えます。
-
-### 最初の依頼例
+推奨依頼：
 
 ```text
-PROJECT.md、AGENTS.mdまたはCLAUDE.mdを読んでください。
-
-.local/data以下で利用可能な入力データを確認し、入力データ自体は変更せず、
-ファイル名、サイズ、形式を一覧化するinventory scriptをanalysis/に作成してください。
-結果は.local/outputへ出してください。
-
-まず実施計画を示し、その後に作業してください。
-commitやpushは行わないでください。
+まだfileを編集しないでください。
+現状、科学的前提、解析単位、data leakage、変更対象、test計画を調査し、
+実装planを提示してください。不明点は推測せず未確定事項として分けてください。
 ```
 
-### 一方の利用上限に達したら、同じworktreeで切り替える
-
-CodexとClaude Codeは会話履歴を共有しませんが、**同じdirectory内のfile、Git差分、未commit変更はそのまま共有できます**。上限到達時にrepositoryをcloneし直したり、新しいworktreeへ移動したりする必要はありません。
-
-1. 現在のagent sessionを停止する。両者を同時に動かさない。
-2. VS Codeで変更fileを保存する。
-3. 統合terminalで状態を確認する。
-
-```bash
-git status --short
-git diff --stat
-```
-
-4. 可能なら `handoffs/CURRENT.md` を短く更新する。
-
-```markdown
-## Current state
-入力inventory scriptは作成済み。出力先のpath処理を修正中。
-
-## Completed
-- analysis/inventory.pyを追加
-- CSVとRDSの判定を実装
-
-## Next actions
-- symlink先のdirectory処理を確認
-- tests/test_inventory.pyを追加
-
-## Validation performed
-- 小規模sampleでPython実行済み
-```
-
-5. 状態が一貫しているなら、task branch上でcheckpoint commitを作ってもよい。
-
-```bash
-git add <必要なfile>
-git commit -m "WIP: checkpoint before agent switch"
-```
-
-途中状態をcommitしたくなければ、未commit差分のままでも同じworktree内で引き継げます。その場合は `handoffs/CURRENT.md` と `git diff` を必ず確認させます。
-
-6. 同じVS Code window、同じ統合terminalのdirectoryで、もう一方を起動する。
-
-```bash
-claude
-# または
-codex
-```
-
-切替後の最初の依頼例：
-
-```text
-PROJECT.md、handoffs/CURRENT.md、git status、git diffを確認してください。
-前のagentが途中まで進めた同じtaskを引き継いでください。
-既存変更を不用意に巻き戻さず、まず現状と次の作業を要約してください。
-commitやpushは行わないでください。
-```
-
-利用上限で前のagentが突然止まり、handoffを書けなかった場合も、新しいagentに `git status`、`git diff`、変更file、test結果を調べさせれば続行できます。
-
-### Codex／Claude画面から終了する
-
-通常は各CLIの終了コマンドを使うか、`Ctrl+C`で戻ります。終了後に次のようなpromptが出れば通常のbashです。
-
-```text
-<user>@<computer>:~/src/<Project>$
-```
+plan承認後、通常modeへ戻して実装します。Claudeの `opusplan` は実装時に別modelへ切り替えるmodel aliasであり、Plan Modeそのものではありません。この基盤では実装中も `opus / xhigh` を標準とします。
 
 ---
 
-## 19. Agent作業後に人間が確認する
+# 8. task worktreeとAgent切替
 
-Agentに自動commit・pushをさせず、まず差分を確認します。
-
-```bash
-git status
-git diff
-```
-
-新規ファイルも確認します。
+長いtaskは専用worktreeで行います。
 
 ```bash
-git status --short
-```
-
-テストや解析を再実行し、問題がなければ人間がcommitします。
-
-```bash
-git add PROJECT.md scripts analysis tests environment.yml
-git commit -m "Set up initial analysis workflow"
-git push
-```
-
-`.local/`以下はGit管理しません。
-
----
-
-# Part V. 日常運用
-
-## 20. 作業を始める時
-
-```bash
-cd ~/src/<Project>
-git status
-git fetch --all --prune
-git pull --rebase
+new-worktree Sepsis.Atlas shared task-001-inventory
+cd ~/worktrees/Sepsis.Atlas/shared-task-001-inventory
 code .
 ```
 
-VS Codeの統合terminalで解析環境を有効化し、CodexまたはClaude Codeを起動します。
+Codexで開始：
 
 ```bash
-conda activate <environment-name>
-codex
-# または
-claude
-```
-
-一方の利用上限に達したら、そのsessionを停止し、同じdirectoryで `handoffs/CURRENT.md` とGit差分を確認してからもう一方を起動します。
-
----
-
-## 21. PCを移る前
-
-```bash
-git status
-git diff
-```
-
-問題がなければcommit・pushします。
-
-```bash
-git add <必要なファイル>
-git commit -m "Describe the completed work"
-git push
-```
-
-未commit、未pushの状態で別PCへ移らないことを原則とします。
-
-データ本体はGitHubではなく、Dropbox、project固有のローカルディスク、HPCなどにあります。別PCで同じデータが必要なら、そのPCでも `.local/data/` のlink先を設定します。
-
----
-
-# Part VI. 切替可能なtask worktreeと独立review worktree
-
-## 22. 上限到達時にagentを切り替えられるshared worktreeを作る
-
-main working treeに未commit変更がないことを確認します。
-
-```bash
-cd ~/src/ProteomicAging
-git status
-```
-
-通常の実装taskは、agent名ではなく `shared` modeで作ることを推奨します。
-
-```bash
-new-worktree ProteomicAging shared task-001-import
-
-cd ~/worktrees/ProteomicAging/shared-task-001-import
-code .
-```
-
-作成されるbranch：
-
-```text
-work/task-001-import
-```
-
-VS Codeの統合terminalで開始します。
-
-```bash
-conda activate proteomic-aging
 codex
 ```
 
-Codexの利用上限に達したら、同じworktreeで停止し、handoffとGit差分を確認してから切り替えます。
+利用上限や作業分担でClaudeへ切り替える場合：
+
+1. Codexを停止する。
+2. `handoffs/CURRENT.md`を更新する。
+3. `git status`と`git diff`を確認する。
+4. 同じworktreeでClaude Codeを起動する。
 
 ```bash
 claude
 ```
 
-agent別worktreeは、独立実装やreviewを同時並行させたい場合に使います。
+同じworktreeで両Agentを同時実行しません。
 
-```bash
-new-worktree ProteomicAging codex experiment-001
-new-worktree ProteomicAging claude review-001
-```
-
-各worktreeには独立した次の領域が作られます。
-
-```text
-.local/scratch
-.local/output
-```
-
-入力data linkはprojectの `scripts/setup-local-links.sh` から再生成されます。
-
-同じworking treeでCodexとClaude Codeを同時に編集させません。shared worktreeでは順次切替、agent別worktreeでは独立作業とreviewに使います。
-
-標準運用：
-
-```text
-shared worktreeで一方が実装
-  ↓
-利用上限または役割交代
-  ↓
-handoffs/CURRENT.md + Git差分
-  ↓
-同じworktreeでもう一方が続行
-  ↓
-必要に応じて別worktreeで独立レビュー
-  ↓
-人間が採否判断
-```
-
----
-
-## 23. 特定branchを基点にreview worktreeを作る
-
-CodexのbranchをClaude Codeでreviewする例：
+独立review用worktree例：
 
 ```bash
 new-worktree \
-  ProteomicAging \
+  Sepsis.Atlas \
   claude \
-  review-001-import \
-  agent/codex/task-001-import
-
-cd ~/worktrees/ProteomicAging/claude-review-001-import
-claude
+  review-001 \
+  work/task-001-inventory
 ```
 
-この実装ではreview用にも新しいbranchが作られます。reviewerに変更させたくない場合は、依頼文で「レビューのみ、ファイル変更禁止」と明示します。
-
----
-
-## 24. worktreeを削除する
-
-まずworktree内に未commit変更がないことを確認します。
+worktree削除：
 
 ```bash
-git status
-```
-
-shared worktreeだけ削除し、branchを残す場合：
-
-```bash
-remove-worktree ProteomicAging shared task-001-import
-```
-
-agent別worktreeの場合：
-
-```bash
-remove-worktree ProteomicAging codex experiment-001
+remove-worktree Sepsis.Atlas shared task-001-inventory
 ```
 
 branchも削除する場合：
 
 ```bash
 remove-worktree \
-  ProteomicAging \
-  codex \
-  task-001-import \
+  Sepsis.Atlas \
+  shared \
+  task-001-inventory \
   --delete-branch
 ```
 
-branchが未mergeなら、Gitが安全のため削除を拒否することがあります。内容を確認してから対応します。
+詳細は [`docs/WORKTREES.md`](docs/WORKTREES.md) を参照してください。
 
 ---
 
-# Part VII. 2台目以降のWindows/WSL2 PC
+# 9. 日常運用と端末間移動
 
-## 25. 方針
-
-2台目以降のWindows/WSL2 PCでは、次をGitHubから取得します。
-
-- `research-dev-infra`
-- 各研究project repository
-- `environment.yml`などの環境定義
-
-次はPCごとに作り直します。
-
-- Codex／Claude Codeのログイン
-- Miniforge環境
-- `~/.research_env`
-- Dropbox共通ルートへのsymlink
-- 各projectの `.local/`
-
-認証情報、conda環境本体、`.local/`をDropboxやGitHubで同期しません。
-
----
-
-## 26. 2台目でinfraを取得する
-
-### 方法A：最初にGitHub CLIを準備できる場合
-
-Git、curl、GitHub CLIを導入し、ログインします。
+## 作業開始
 
 ```bash
-gh auth login
-gh auth setup-git
-```
-
-その後：
-
-```bash
-mkdir -p ~/src
-cd ~/src
-
-gh repo clone <GitHubAccount>/research-dev-infra
-cd research-dev-infra
-```
-
-### 方法B：まだGitHub CLIがない場合
-
-Windowsブラウザでprivate repositoryのZIPをダウンロードして、1台目と同様にWSL2へ展開します。その後、以下を実行します。
-
-```bash
-cd ~/src/research-dev-infra
-
-bash scripts/bootstrap-ubuntu.sh \
-  --git-name "Takanori Hasegawa" \
-  --git-email "GitHubに登録しているメールアドレス"
-
-gh auth login
-gh auth setup-git
-```
-
-ZIP展開版をそのまま使うより、認証後にGit cloneへ置き換える方が以後の更新が簡単です。
-
-```bash
-cd ~/src
-mv research-dev-infra research-dev-infra-from-zip
-
-gh repo clone <GitHubAccount>/research-dev-infra
-```
-
-必要がなくなったことを確認してからZIP版を削除します。
-
----
-
-## 27. 2台目のマシン設定
-
-```bash
-cd ~/src/research-dev-infra
-bash scripts/setup-machine.sh
-source ~/.bashrc
-
-# Windows側にVisual Studio Codeを導入後
-setup-vscode
-
-install-miniforge
-source ~/.bashrc
-
-install-coding-agents
-source ~/.bashrc
-
-research-doctor
-```
-
-Dropboxの位置が1台目と異なる場合は、`--dropbox-home`でそのPCの実パスを指定します。project固有のローカルディスクはmachine setupでは登録しません。
-
----
-
-## 28. 2台目で研究projectを取得する
-
-```bash
-cd ~/src
-gh repo clone <GitHubAccount>/ProteomicAging
-cd ProteomicAging
-```
-
-データリンクを設定します。
-
-```bash
-nano scripts/setup-local-links.sh
-setup-project-links
-research-doctor ProteomicAging
-```
-
-通常、`scripts/setup-local-links.sh`自体はGitHubから取得済みです。同じDropbox相対パスを使えるPCなら編集せず、そのまま `setup-project-links` を実行できます。
-
-解析環境を再作成します。
-
-```bash
-mamba env create -f environment.yml
-conda activate proteomic-aging
-analysis-smoke-test ProteomicAging
-code .
-```
-
-VS CodeのCodex、Claude Code extensionはPCごとにサインインします。これで1台目と同じコードを使って解析でき、どちらかの利用上限に達した場合も同じworktreeで別のagentへ切り替えられます。
-
----
-
-# Part VIII. データの置き場所
-
-## 29. GitHubに置くもの
-
-- ソースコード
-- shell / R / Python script
-- 軽量な設定
-- `PROJECT.md`、`AGENTS.md`、`CLAUDE.md`
-- docs
-- tests
-- metadata schema
-- 小さなTSV / CSV
-- `environment.yml`
-- 入力データの取得手順
-
----
-
-## 30. Dropbox `Research` / `ForShareLargeData`から参照するもの
-
-既存構造は変更しません。必要な場所を `.local/data/` にlinkします。
-
-主な用途：
-
-- 論文PDF
-- Supplementary files
-- 研究資料
-- metadata source
-- 複数PCで共有したい処理済みデータ
-- 比較的小〜中規模のRDS / H5AD
-- 確定成果物
-
-Dropbox上の入力ファイルは、原則として読み取り専用として扱います。
-
-頻繁に書き換えるDuckDB、SQLite、HDF5、workflow work directory、大量ログなどはDropbox上で直接運用しません。
-
----
-
-## 31. project固有のローカルディスクに置くもの
-
-PC全体で固定の保存先や名前は決めません。研究ごとに必要なら、内蔵SSD、外付けSSD、別ドライブなどの任意の場所を使います。
-
-主な用途：
-
-- 数十GB〜TB級データ
-- FASTQ / BAM / CRAM
-- Cell Ranger全出力
-- 大規模RDS / H5AD
-- integration object
-- model checkpoint
-- PC固有の作業結果
-
-projectからは実パスを直接linkします。
-
-```bash
-link_data "/mnt/e/<Project>/raw" raw
-```
-
-working outputをそこへ置く場合：
-
-```bash
-use_output_dir "/mnt/e/<Project>/results/$WORKSPACE_NAME"
-```
-
-ローカル大容量領域を使わないprojectでは何も設定しません。
-
----
-
-## 32. 端末ローカルのscratchに置くもの
-
-```text
-~/scratch/<Project>/<Workspace>
-```
-
-主な用途：
-
-- 再生成可能な一時ファイル
-- 高頻度I/O
-- 大量の小ファイル
-- 一時展開
-- cache
-- workflowの中間生成物
-
-WSL2ではLinux filesystem、macOSではMacのローカルfilesystemにGit repositoryと高頻度I/Oの作業領域を置きます。どちらもDropbox直下では実行しません。
-
----
-
-# Part IX. infra repository自体を更新する
-
-## 33. 別PCで変更されたinfraを取り込む
-
-```bash
-cd ~/src/research-dev-infra
-git status
+cd ~/src/Sepsis.Atlas
+git fetch --all --prune
 git pull --rebase
+conda activate sepsis-atlas
 ```
 
-setup scriptやcommand symlinkが増えた場合は、再度実行します。
+worktreeを使う場合：
 
 ```bash
-bash scripts/setup-machine.sh
-source ~/.bashrc
-research-doctor
+cd ~/worktrees/Sepsis.Atlas/shared-task-001-inventory
+git status
 ```
 
-旧版で `LOCAL_ROOT` / `LocalLarge` を設定していた場合も、この再実行で `~/.research_env` は新形式へ更新されます。旧版から作成済みのprojectで `scripts/setup-local-links.sh` に `$LOCAL_ROOT` が残っている場合は、任意の実パスへ置き換えます。
+## 作業終了・別端末へ移る前
 
 ```bash
-link_data "/mnt/e/<Project>/raw" raw
-use_output_dir "/mnt/e/<Project>/results/$WORKSPACE_NAME"
-```
-
-ローカル大容量領域が不要なprojectでは、その行を削除するだけです。
-
----
-
-## 34. READMEやscriptを変更してGitHubへ反映する
-
-```bash
-cd ~/src/research-dev-infra
-
 git status
 git diff
-bash -n scripts/*.sh
-shellcheck scripts/*.sh templates/project/scripts/*.sh
 ```
 
-問題がなければ：
+必要な変更をcommitしてpushします。
 
 ```bash
-git add README.md scripts docs templates
-git commit -m "Expand setup and analysis workflow documentation"
+git add <確認済みfile>
+git commit -m "Describe completed work"
 git push
 ```
 
+別端末では：
+
+```bash
+cd ~/src/Sepsis.Atlas
+git fetch --all --prune
+git switch <branch>
+git pull --rebase
+setup-project-links
+```
+
+同じbranchを複数端末で同時編集しません。未commit変更を端末間で同期する目的でDropboxを使いません。
+
 ---
 
-# Part X. よくある問題
+# 10. データの置き場所
 
-## 35. `command not found: new-project`など
+## GitHub
 
-```bash
-source ~/.bashrc
+- source code
+- R / Python / shell script
+- tests
+- docs
+- `PROJECT.md`、`AGENTS.md`、`CLAUDE.md`
+- 小さなmetadataやschema
+- `environment.yml`
+- データ取得手順
+
+## Dropbox
+
+- 既存の共有研究データ
+- 論文やreference資料
+- 複数端末で共有する必要がある中規模データ
+
+Dropboxの既存directory構造は変更せず、projectから必要なsubpathだけ参照します。
+
+## project固有local disk / HPC
+
+- 数百GB以上のデータ
+- GPU処理用データ
+- 一時的な中間生成物
+- 再生成可能な大容量結果
+
+全端末共通の固定local rootは作りません。projectごとに絶対pathを `scripts/setup-local-links.sh` へ記述します。
+
+## scratch
+
+- trial output
+- cache
+- temporary file
+- Agentが生成する作業途中の成果物
+
+標準path：
+
+```text
+~/scratch/<Project>/<Workspace>/
 ```
 
-それでも見つからない場合：
+---
 
-```bash
-echo "$PATH"
-ls -l ~/.local/bin
-cat ~/.research_env
-```
+# 11. infraを更新する
 
-`setup-machine.sh`を再実行します。
+通常の更新：
 
 ```bash
 cd ~/src/research-dev-infra
+git pull --rebase
 bash scripts/setup-machine.sh
+```
+
+Shellを再読込します。
+
+```bash
+# WSL2
 source ~/.bashrc
+
+# macOS
+source ~/.zshrc
 ```
 
----
-
-## 36. Dropbox directory was not found
-
-Windows側でDropboxが起動しており、次が存在するか確認します。
+infra自体を変更した場合：
 
 ```bash
-ls -ld "/mnt/c/Users/<WindowsUser>/Dropbox/Research"
-ls -ld "/mnt/c/Users/<WindowsUser>/Dropbox/ForShareLargeData"
-```
-
-Dropboxの実際の場所が異なる場合：
-
-```bash
-bash scripts/setup-machine.sh \
-  --dropbox-home "/mnt/c/実際の/Dropbox"
-```
-
----
-
-## 37. Dropboxファイルが見えるが読めない
-
-Dropboxの「オンラインのみ」状態で、実体がまだPCにダウンロードされていない可能性があります。Windows側のDropboxで対象folderまたはfileをローカル保存状態にしてから再確認します。
-
-```bash
-ls -lh .local/data/<link-name>
-```
-
----
-
-## 38. `claude: command not found`
-
-```bash
-curl -fsSL https://claude.ai/install.sh | bash -s stable
-hash -r
-source ~/.bashrc
-claude --version
-```
-
-最新版のinfraでは、Codexを自動起動せず、その後にClaude Code installerまで進むようになっています。
-
----
-
-## 39. `codex`を実行すると通常promptへ戻る
-
-通常promptの例：
-
-```text
-<user>@<computer>:~/src/<Project>$
-```
-
-installerのパイプ内から起動された場合は標準入力の都合ですぐ終了することがあります。通常のbashから、対象project内で改めて直接実行します。
-
-```bash
-cd ~/src/<Project>
-codex
-```
-
-それでも終了する場合：
-
-```bash
-codex --version
-which codex
-```
-
-versionが表示されればインストール自体は完了しています。
-
----
-
-## 40. `new-worktree`がmainの未commit変更を理由に止まる
-
-安全のための仕様です。
-
-```bash
-cd ~/src/<Project>
+cd ~/src/research-dev-infra
 git status
 git diff
+bash -n scripts/*.sh templates/project/scripts/*.sh
 ```
 
-変更をcommitするか、意図的にstashしてから再実行します。
+確認後：
 
 ```bash
-git stash push -u -m "Temporary before worktree"
+git add README.md docs scripts templates
+git commit -m "Describe infrastructure update"
+git pull --rebase origin main
+git push
 ```
 
-作業後に戻す場合：
+Git操作前にはrepositoryを確認します。
 
 ```bash
-git stash pop
+pwd
+git remote get-url origin
+git branch --show-current
 ```
 
 ---
 
-## 41. `analysis-smoke-test`でRだけwarningになる
+# 12. 提供command
 
-active environmentにRを入れていないだけなら問題ありません。Rを使うprojectであれば追加します。
-
-```bash
-mamba install -n <environment-name> -c conda-forge r-base
-```
-
----
-
-## 42. GitHubへ大きなfileをcommitしてしまった
-
-push前なら、Gitのindexから外します。
-
-```bash
-git rm --cached <large-file>
-```
-
-`.gitignore`へ追加してcommitし直します。既にpushした大容量fileの履歴削除は別途対応が必要です。研究データは原則として `.local/`、Dropbox、project固有のローカルディスク、HPCへ置きます。
-
----
-
-## 43. `setup-vscode: command not found`
-
-`setup-vscode.sh`を追加した後にinfra repositoryだけを更新し、`setup-machine.sh`を再実行していない場合に発生します。`setup-machine.sh`は共通commandを`~/.local/bin/`へsymlinkとして登録します。
-
-```bash
-cd ~/src/research-dev-infra
-
-bash scripts/setup-machine.sh
-
-source ~/.bashrc
-hash -r
-command -v setup-vscode
-```
-
-正常なら、次のようなpathが表示されます。
-
-```text
-/home/<user>/.local/bin/setup-vscode
-```
-
-その後に実行します。
-
-```bash
-setup-vscode
-```
-
-急いでいる場合はcommand登録を待たず、repository内のscriptを直接実行できます。
-
-```bash
-cd ~/src/research-dev-infra
-bash scripts/setup-vscode.sh
-```
-
-まだ見つからない場合は次を確認します。
-
-```bash
-ls -l ~/.local/bin/setup-vscode
-echo "$PATH" | tr ':' '\n' | grep -F "$HOME/.local/bin"
-```
-
----
-
-## 44. `code: command not found`またはVS CodeがWindows側directoryを開く
-
-Visual Studio CodeはWindowsへインストールし、Microsoft WSL extensionを使います。Ubuntu内へLinux版VS Codeをaptで入れません。
-
-Windows PowerShell：
-
-```powershell
-winget install --id Microsoft.VisualStudioCode -e
-```
-
-Windows版VS CodeでMicrosoftの `WSL` extensionを入れ、Ubuntuを開き直します。
-
-```bash
-code --version
-setup-vscode
-cd ~/src/<Project>
-code .
-```
-
-VS Code左下にWSL接続が表示され、terminalのpromptが `/home/<user>/src/<Project>` を指していることを確認します。
-
-## 45. extensionが「VS Codeのversionと互換性がない」と表示される
-
-例：
-
-```text
-Can't install ... because it is not compatible with the current version of Visual Studio Code
-```
-
-WSL側の `code --version` が古い場合に発生します。Windows版VS Codeと、WSL内で動くVS Code Serverは対応するversionで動作するため、Ubuntu側だけを更新しても解決しません。
-
-まず確認します。
-
-```bash
-code --version
-```
-
-1.98.0未満なら、VS Codeをすべて閉じ、Windows PowerShellで更新します。
-
-```powershell
-winget upgrade --id Microsoft.VisualStudioCode -e
-wsl --shutdown
-```
-
-更新候補が見つからない場合：
-
-```powershell
-winget install --id Microsoft.VisualStudioCode -e
-wsl --shutdown
-```
-
-Ubuntuを開き直して確認し、再実行します。
-
-```bash
-code --version
-setup-vscode
-```
-
-新しいWindows版VS Codeへ更新しても古いWSL Serverが残る場合は、VS Codeをすべて閉じた状態で、古いversionのdirectoryだけを削除して `code .` を再実行します。通常は `wsl --shutdown` と再接続だけで自動更新されるため、手動削除は最後の手段です。
-
-```bash
-ls ~/.vscode-server/bin
-```
-
-今回の `setup-vscode` は、最低version未満ならextension導入前に停止し、extensionごとの失敗も集計して非zeroで終了します。失敗があったのに `VS Code setup completed successfully` と表示することはありません。
-
-## 46. CodexまたはClaude Codeの利用上限に達した
-
-障害ではありません。現在のagentを停止し、同じworktreeのまま次を実行します。
-
-```bash
-git status --short
-git diff --stat
-```
-
-`handoffs/CURRENT.md`を更新し、もう一方を起動します。
-
-```bash
-claude
-# または
-codex
-```
-
-新しいagentには、最初に `PROJECT.md`、`handoffs/CURRENT.md`、`git status`、`git diff`を読ませます。別worktreeを新規作成する必要はありません。
-
----
-
-# Part XI. 提供コマンド一覧
-
-| コマンド | 用途 |
+| command | 用途 |
 |---|---|
 | `bash scripts/bootstrap-ubuntu.sh` | WSL2 Ubuntuへ基本toolを導入 |
 | `bash scripts/bootstrap-macos.sh` | macOSへHomebrewと基本toolを導入 |
-| `new-project` | 新規project repositoryを作成 |
-| `new-worktree` | sharedまたはagent別のbranchとworktreeを作成 |
+| `bash scripts/setup-machine.sh` | Dropbox root、共通directory、commandを設定 |
+| `new-project` | 新規projectを作成 |
+| `new-worktree` | sharedまたはAgent別worktreeを作成 |
 | `remove-worktree` | worktreeを安全に削除 |
 | `setup-project-links` | `.local`のdata / scratch / output linkを生成 |
-| `research-doctor` | WSL2/macOS、GitHub、Dropbox、Agent環境を点検 |
-| `install-coding-agents` | CodexとClaude Codeを公式installerで導入 |
-| `setup-vscode` | OSに応じたVS Code、Codex、Claude Code、解析extensionを導入 |
-| `setup-agent-defaults` | Codex gpt-5.6/xhighとClaude Code stable/opus/xhighを標準設定 |
+| `research-doctor` | machineとprojectを診断 |
+| `install-coding-agents` | CodexとClaude Codeを導入 |
+| `setup-vscode` | OSに応じたVS Code extensionを導入 |
+| `setup-agent-defaults` | Codex gpt-5.6/xhigh、Claude stable/opus/xhighを設定 |
 | `setup-emacs` | WSL2またはmacOSへEmacsを導入 |
-| `install-miniforge` | WSL2またはmacOSへMiniforgeを導入 |
-| `analysis-smoke-test` | projectのGit、data link、scratch、Python/Rを確認 |
+| `install-miniforge` | OSとCPU architectureに応じてMiniforgeを導入 |
+| `analysis-smoke-test` | Git、link、scratch、Python/Rを確認 |
 
-各commandのhelp：
+help：
 
 ```bash
 new-project --help
@@ -2086,55 +869,30 @@ setup-emacs --help
 
 ---
 
-# Part XII. 重要な注意
+# 13. 重要な注意
 
-## Agentへの指示はOSレベルの完全な隔離ではない
-
-`AGENTS.md`、`CLAUDE.md`、`PROJECT.md`はAgentへの作業規則です。OSのpermissionやcontainerによる完全なsecurity boundaryではありません。
-
-したがって、次を守ります。
+`AGENTS.md`、`CLAUDE.md`、`PROJECT.md`はAgentへの指示であり、OS permissionやcontainerによる完全なsecurity boundaryではありません。
 
 - Agentは対象repositoryまたはworktreeから起動する。
-- Dropbox rootや `~/src` rootから起動しない。
+- Dropbox root、`~/src` root、home directoryから起動しない。
 - 必要な入力だけ `.local/data/` にlinkする。
 - secret、token、`.env`をrepositoryへ置かない。
 - 入力データを直接変更させない。
-- commit、push、merge、rebaseは原則として人間が確認後に行う。
-- Agent作業後は必ず `git status` と `git diff` を確認する。
-- 利用上限でagentを切り替える場合は同じworktreeを使い、`handoffs/CURRENT.md`を引継ぎに使う。
+- commit、push、merge、rebaseは人間が差分確認後に行う。
+- Agent作業後は `git status` と `git diff` を確認する。
 - 同じworktreeでCodexとClaude Codeを同時稼働させない。
+- 患者level dataや機密性の高い未公開データを外部modelへ直接渡さない。
 
 ---
 
-# Part XIII. 詳細文書
+# 14. 詳細文書
 
-- [WSL2導入後から最初の解析まで](docs/FROM_WSL_TO_FIRST_ANALYSIS.md)
-- [マシン設定](docs/MACHINE_SETUP.md)
-- [Macセットアップ](docs/MAC_SETUP.md)
+- [WSL2詳細セットアップ](docs/FROM_WSL_TO_FIRST_ANALYSIS.md)
+- [macOS詳細セットアップ](docs/MAC_SETUP.md)
+- [machine設定](docs/MACHINE_SETUP.md)
 - [新規project開始](docs/NEW_PROJECT.md)
 - [worktree運用](docs/WORKTREES.md)
+- [トラブルシューティング](docs/TROUBLESHOOTING.md)
 - [公式参照先](docs/OFFICIAL_REFERENCES.md)
 
-READMEを標準手順書とし、詳細な背景や補足は `docs/` を参照します。
-
----
-
-# Official references
-
-- [Microsoft: Working across Windows and Linux file systems](https://learn.microsoft.com/en-us/windows/wsl/filesystems)
-- [Visual Studio Code: Installing on macOS](https://code.visualstudio.com/docs/setup/mac)
-- [Dropbox: macOS File Provider support](https://help.dropbox.com/installs/dropbox-for-macos-support)
-- [Homebrew](https://brew.sh/)
-- [Microsoft: Set up a WSL development environment](https://learn.microsoft.com/en-us/windows/wsl/setup/environment)
-- [GitHub CLI: gh auth login](https://cli.github.com/manual/gh_auth_login)
-- [GitHub CLI: gh repo create](https://cli.github.com/manual/gh_repo_create)
-- [GitHub CLI environment variables](https://cli.github.com/manual/gh_help_environment)
-- [Miniforge](https://github.com/conda-forge/miniforge)
-- [Microsoft: Developing in WSL with Visual Studio Code](https://code.visualstudio.com/docs/remote/wsl)
-- [OpenAI Codex documentation](https://developers.openai.com/codex/)
-- [OpenAI Codex VS Code extension](https://marketplace.visualstudio.com/items?itemName=OpenAI.chatgpt)
-- [Claude Code documentation](https://code.claude.com/docs/en/setup)
-- [Claude Code model configuration](https://code.claude.com/docs/en/model-config)
-- [Claude Code permission modes](https://code.claude.com/docs/en/permission-modes)
-- [GNU Emacs manual](https://www.gnu.org/software/emacs/manual/emacs.html)
-- [Claude Code in VS Code](https://code.claude.com/docs/en/vs-code)
+READMEは共通の標準手順だけを扱い、OS固有の補足や問題解決は `docs/` を参照します。
