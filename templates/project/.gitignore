@@ -1,4 +1,4 @@
-# Machine-local data and outputs
+# Machine-local link layer, secrets, and disposable outputs
 .local/
 .env
 .env.*

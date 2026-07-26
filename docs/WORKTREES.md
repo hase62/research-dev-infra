@@ -174,6 +174,18 @@ scientific assumptions、実装状態、未完了testを独立に確認してか
 
 ## 7. PC AからPC Bへtaskを移す
 
+移動前に、taskの継続に必要な状態を次の2系統へ集約します。
+
+```text
+GitHub
+  code、Markdown指示、設定、handoff、small metadata
+
+Dropbox
+  data、大きな中間・最終成果物
+```
+
+worktree folder、`.local/`、環境、scratchは再構築対象であり、正本ではありません。
+
 ### PC A
 
 ```bash
@@ -190,7 +202,7 @@ git status
 
 最後にworking treeがcleanであることを確認します。
 
-Git管理しない中間outputが必要なら、Dropbox、HPC、project固有の永続diskへ保存し、pathと再生成方法をhandoffへ書きます。`~/scratch`の内容はPC Bへ移りません。
+Git管理しない中間outputがPC Bでも必要なら、原則としてDropbox上の共有outputへ保存します。既に`~/scratch`へ作成した場合は、PC移動前に共有先へ移し、pathと再生成方法をhandoffへ書きます。`~/scratch`の内容はPC Bへ移りません。
 
 ### PC B
 
@@ -216,7 +228,7 @@ git status
 code .
 ```
 
-`new-worktree`は`origin/work/metadata-audit`を検出し、tracking branchを作ります。`.local` linkとscratch/outputはPC B向けに再生成されます。
+`new-worktree`は`origin/work/metadata-audit`を検出し、tracking branchを作ります。Git管理された指示・code・handoffはbranchから復元され、`.local` linkはPC B向けに再生成されます。共有dataと永続outputはDropboxの同じ論理pathを参照します。
 
 ### PC Aへ戻る
 
@@ -245,18 +257,32 @@ task branch
 PROJECT.md
 AGENTS.md / CLAUDE.md
 handoffs/CURRENT.md
+小さなmetadata・manifest・QC summary
+```
+
+Dropbox経由で移動するもの：
+
+```text
+共有data
+論文・supplement
+大きな中間成果物
+再生成コストが高い成果物
+最終output
 ```
 
 移動しないもの：
 
 ```text
 未commit変更
-.local link
+.local linkそのもの
 conda/mamba環境
-~/scratch output
+再生成可能な~/scratch output
 実行中process
 Agent chat session
+credential・token
 ```
+
+原則として、PC移動後も必要なfileを「移動しないもの」へ残しません。GitへcommitできるものはGitHubへ、大きなfileはDropboxへ保存します。
 
 運用ルール：
 

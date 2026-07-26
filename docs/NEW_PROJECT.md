@@ -42,7 +42,7 @@ new-project Sepsis.Atlas --github my-organization/Sepsis.Atlas
     └── scratch -> ~/scratch/Sepsis.Atlas/main/scratch
 ```
 
-`.local/`はGit管理されません。標準ではscratchとworking outputを各端末の `~/scratch/` 以下へ置きます。
+`.local/`はGit管理されませんが、fileの正本を置く場所ではありません。共有dataと永続outputへのsymlink、およびlocal scratchへのsymlinkをまとめるlink層です。標準のworking outputは`~/scratch/`以下ですが、別PCで必要になるoutputはDropbox上の共有directoryへ切り替えます。
 
 ## 2. PROJECT.mdを書く
 
@@ -75,24 +75,25 @@ link_data "$RESEARCH_ROOT/Papers/Aging/Proteomics" papers
 link_data "$LARGE_ROOT/Proteomics/PublicData" public_data
 ```
 
-PC固有のローカルSSDや外付けディスクを使う研究では、その実パスを直接指定します。
+通常は`$RESEARCH_ROOT`または`$LARGE_ROOT`以下のDropbox pathを指定します。PC固有のローカルSSDや外付けdiskは、共有不要かつ再生成可能なcacheなどに限る例外です。例外pathはtracked scriptへPC名とともに直書きせず、`~/.research_env`のproject固有環境変数から受け取ります。
+
+別PCでも必要なworking outputや最終outputは、原則としてDropboxへ置くよう次を追加します。
 
 ```bash
-# WSL2例
-link_data "/mnt/e/ProteomicAging/large_objects" large_objects
-
-# macOS例
-link_data "/Volumes/ExternalSSD/ProteomicAging/large_objects" large_objects
+use_output_dir "$LARGE_ROOT/ProteomicAging/results/$WORKSPACE_NAME"
 ```
 
-working outputも外部ディスクへ置きたいprojectだけ、次を追加します。
+共有不要かつ再生成可能な巨大cacheだけをlocal diskへ置く特殊例：
 
 ```bash
-# WSL2例
-use_output_dir "/mnt/e/ProteomicAging/results/$WORKSPACE_NAME"
+# ~/.research_env（PCごとの設定。Gitへ入れない）
+export PROTEOMIC_AGING_LOCAL_CACHE_ROOT="/mnt/e/ProteomicAging/cache"  # WSL2
+# export PROTEOMIC_AGING_LOCAL_CACHE_ROOT="/Volumes/ExternalSSD/ProteomicAging/cache"  # macOS
 
-# macOS例
-use_output_dir "/Volumes/ExternalSSD/ProteomicAging/results/$WORKSPACE_NAME"
+# scripts/setup-local-links.sh（Gitへcommit）
+if [[ -n "${PROTEOMIC_AGING_LOCAL_CACHE_ROOT:-}" ]]; then
+  link_data "$PROTEOMIC_AGING_LOCAL_CACHE_ROOT" local_cache
+fi
 ```
 
 共通root変数は次の2つだけです。
@@ -120,11 +121,11 @@ research-doctor Sepsis.Atlas
 
 ```bash
 git add PROJECT.md scripts/setup-local-links.sh
-git commit -m "Configure project and local data links"
+git commit -m "Configure project data and output links"
 git push
 ```
 
-データ本体やsymlinkは `.local/`配下なのでcommitされません。`scripts/setup-local-links.sh`にはDropboxの共通パスや、必要なproject固有のローカルパスだけが残ります。
+データ本体やsymlinkは `.local/`配下なのでcommitされません。一方、どの共有pathを使うかを定義する`scripts/setup-local-links.sh`はcommitします。通常はDropboxの共通rootからのpathだけを記述し、PC固有pathは例外的な環境変数として扱います。
 
 ## 5. VS Codeで作業を始める
 
@@ -168,7 +169,7 @@ setup-project-links
 research-doctor Sepsis.Atlas
 ```
 
-Dropbox内の必要なfileをそのPCでローカル保存状態にします。外部disk pathがPCごとに異なる場合は、そのPCの実パスに合わせてlink設定を調整します。
+Dropbox内の必要なfileをそのPCでoffline利用可能な状態にします。共有linkは`$RESEARCH_ROOT`と`$LARGE_ROOT`から再構築されるため、通常はPCごとのscript修正は不要です。特殊なlocal cacheだけ、`~/.research_env`のproject固有環境変数を設定します。
 
 進行中のtaskを再開する場合は、同じtask名でlocal worktreeを再構築します。
 
@@ -180,7 +181,7 @@ cd ~/worktrees/Sepsis.Atlas/shared-metadata-audit
 code .
 ```
 
-移動元PCでは、先に`handoffs/CURRENT.md`を更新し、checkpoint commitをpushします。未commit変更、`.local`、解析環境、scratch output、Agent chat sessionは別PCへ移りません。
+移動元PCでは、先に`handoffs/CURRENT.md`を更新し、checkpoint commitをpushします。別PCでも必要な大きなoutputはDropboxへ保存します。未commit変更、`.local`のlink、解析環境、再生成可能なscratch、Agent chat sessionは別PCへ移りません。
 
 ## 新しい端末から始める場合
 

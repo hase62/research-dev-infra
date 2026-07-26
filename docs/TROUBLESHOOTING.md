@@ -466,7 +466,7 @@ push前ならstageから外します。
 git restore --staged path/to/file
 ```
 
-`.gitignore`へ追加し、必要ならDropboxまたはproject固有local diskへ移します。
+`.gitignore`へ追加します。複数PCで必要なfileや永続成果物はDropboxへ移し、共有不要かつ再生成可能なcacheだけをlocal diskへ残します。
 
 一度Git履歴へcommitした大容量fileの削除は履歴書換えを伴うため、push前後の状態を確認して個別に対応します。
 

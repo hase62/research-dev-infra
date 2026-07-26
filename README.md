@@ -12,9 +12,12 @@ WSL2またはmacOS上で、GitHub、Dropbox、VS Code、Emacs、Codex、Claude C
 
 - 研究projectごとにGitHub repositoryを分ける。
 - Git working treeはDropbox外の `~/src/` に置く。
-- Dropboxの既存構造は変更しない。
-- 必要なデータだけ各projectの `.local/data/` にsymlinkする。
-- 大規模データ、秘密情報、解析中の出力はGitHubへ入れない。
+- **永続化すべき情報の唯一のコピーを、特定PCだけに置かない。**
+- code、設定、手順、Agent指示、handoff、小さなmetadataはGitHubで共有する。
+- data、論文、大きな中間成果物・最終成果物はDropboxで共有する。
+- Dropboxの既存構造は変更せず、必要なsubpathだけ各projectの `.local/` にsymlinkする。
+- `.local/`は保存先ではなく、共有storageとlocal scratchをproject内から参照するlink層とする。
+- PC固有に残してよいものは、credential、環境本体、cache、temporary file、再生成可能なscratchに限定する。
 - CodexとClaude Codeはproject repositoryまたは専用worktreeの中から起動する。
 - 同じworking treeをCodexとClaude Codeに同時編集させない。
 - 端末固有の設定は `~/.research_env` とprojectの `.local/` に閉じ込める。
@@ -62,7 +65,7 @@ WSL2ではrepositoryをLinux filesystemの `~/src/` に置き、Windows版VS Cod
     └── output/
 ```
 
-標準ではscratchとoutputを `~/scratch/<Project>/<Workspace>/` に置きます。project固有の外付けSSDや大容量diskを使う場合だけ、`scripts/setup-local-links.sh` で個別に指定します。
+`.local/scratch`は常にlocalの一時領域です。`.local/output`は未設定時には `~/scratch/<Project>/<Workspace>/output` を指しますが、これは**再生成可能なworking output用の暫定先**です。別PCで必要になる成果物、再生成コストが高い成果物、最終成果物は、`scripts/setup-local-links.sh`でDropbox上の共有directoryを`.local/output`へ割り当てます。
 
 ---
 
@@ -490,34 +493,43 @@ analysis-smoke-test Sepsis.Atlas
 
 GitHubまたはDropboxで同期しないもの：
 
-- credential
-- conda環境本体
-- `.local/`
-- scratch/output
+- credential、token、secret
+- conda/mamba環境本体
+- `.local/`のsymlinkそのもの
+- cache、temporary file、再生成可能なlocal scratch
+- 実行中processとAgent chat session
+
+`.local/`のlink先となるdataや永続outputは、原則としてDropbox上にあります。特定PCにだけ必要な絶対pathを使うのは例外です。
 
 ---
 
 # 5. データlinkを設定する
 
-projectの `scripts/setup-local-links.sh` に、必要なデータだけ記述します。
+projectの `scripts/setup-local-links.sh` に、必要な共有dataとoutputだけ記述します。このscript自体はGitHubへcommitし、どのPCでも同じ論理pathを再構築できるようにします。
 
-Dropbox例：
+通常の共有設定：
 
 ```bash
 link_data "$RESEARCH_ROOT/Sepsis/metadata" metadata
 link_data "$LARGE_ROOT/Sepsis/processed" processed
+
+# 別PCでも必要な中間・最終成果物はDropboxへ置く
+use_output_dir "$LARGE_ROOT/Sepsis/results/$WORKSPACE_NAME"
 ```
 
-project固有local disk例：
+`.local/scratch`はlocal一時領域、`.local/output`は上記の共有成果物directoryへの入口になります。`use_output_dir`を指定しない場合、`.local/output`はlocal scratch配下を指すため、そこにあるものは再生成可能であることを前提とします。
+
+PC固有local diskは、共有不要かつ再生成可能な巨大cacheなどに限る例外です。どうしても使う場合は、PCごとの環境変数を`~/.research_env`へ追加し、tracked scriptへPC名や個別pathを直接書き込まない形を推奨します。
 
 ```bash
-# WSL2
-link_data "/mnt/e/SepsisAtlas/data" local_data
-use_output_dir "/mnt/e/SepsisAtlas/results/$WORKSPACE_NAME"
+# ~/.research_envにPCごとに設定する例
+export SEPSIS_LOCAL_CACHE_ROOT="/mnt/e/SepsisAtlas/cache"  # WSL2
+# export SEPSIS_LOCAL_CACHE_ROOT="/Volumes/ExternalSSD/SepsisAtlas/cache"  # macOS
 
-# macOS
-link_data "/Volumes/ExternalSSD/SepsisAtlas/data" local_data
-use_output_dir "/Volumes/ExternalSSD/SepsisAtlas/results/$WORKSPACE_NAME"
+# scripts/setup-local-links.sh側
+if [[ -n "${SEPSIS_LOCAL_CACHE_ROOT:-}" ]]; then
+  link_data "$SEPSIS_LOCAL_CACHE_ROOT" local_cache
+fi
 ```
 
 反映：
@@ -600,6 +612,30 @@ Emacsを使う場合も、Agentは同じproject terminalから起動します。
 ```bash
 cd ~/src/Sepsis.Atlas
 e PROJECT.md
+```
+
+## Agentが読む指示file
+
+Agentへの継続的な指示は、特定PCのchat履歴やlocal noteではなく、repository内のtracked Markdownへ置きます。
+
+```text
+AGENTS.md
+CLAUDE.md
+PROJECT.md
+README.md
+handoffs/CURRENT.md
+関連するdocs/*.md
+```
+
+worktreeにはtask branchのtracked fileがcheckoutされるため、これらも同じbranchに含まれます。Codexは`AGENTS.md`を起点にし、Claude Codeは`CLAUDE.md`を起点にします。両fileから`PROJECT.md`と`handoffs/CURRENT.md`を読むよう指示しているため、VS Codeでworktree rootを開けば同じ共有指示を利用できます。
+
+GitHubの`main`だけに指示の新版があり、進行中task branchへ未反映の場合、その新版はworktreeから見えません。必要な変更はtask branchへmergeしてpushします。
+
+```bash
+cd ~/worktrees/Sepsis.Atlas/shared-metadata-audit
+git fetch origin
+git merge origin/main
+git push
 ```
 
 ## Plan Mode
@@ -811,7 +847,7 @@ git status
 
 最後にworking treeがcleanであることを確認します。
 
-Git管理しない中間outputが移動先でも必要なら、Dropbox、HPC、project固有の永続diskへ保存し、そのpathと再生成方法をhandoffへ書きます。`~/scratch`、conda環境、Agent chat session、未commit変更は別PCへ移りません。
+移動先でも必要な中間outputは、handoff直前までlocalに放置せず、原則としてDropbox上の共有outputへ保存します。既にlocal scratchへ作成した場合は、移動前にDropboxへ移し、共有pathと再生成方法を`handoffs/CURRENT.md`へ記録します。`~/scratch`、conda環境、Agent chat session、未commit変更は別PCへ移りません。
 
 ### 移動先PC
 
@@ -837,7 +873,7 @@ git status
 code .
 ```
 
-`new-worktree`は`origin/work/metadata-audit`を検出し、tracking branchとlocal worktreeを作ります。`.local` linkとscratch/outputはそのPC向けに再生成されます。
+`new-worktree`は`origin/work/metadata-audit`を検出し、tracking branchとlocal worktreeを作ります。Git管理された指示・code・handoffはbranchから復元され、`.local` linkはそのPC向けに再生成されます。共有dataと永続outputはDropboxの同じ論理pathを参照します。
 
 ### 元PCへ戻る
 
@@ -914,7 +950,7 @@ git push origin --delete work/metadata-audit
 
 squash mergeではGitがlocal branchをmerge済みと判定せず、`--delete-branch`がbranchを残す場合があります。PRとmainへの反映を確認した後の手動削除方法は[`docs/WORKTREES.md`](docs/WORKTREES.md)を参照してください。
 
-未commit変更があるworktreeは削除されません。`.local/output`に残すべき成果物がある場合も、削除前に保存先を確認します。
+未commit変更があるworktreeは削除されません。`.local/output`がlocal scratchを指している場合、必要な成果物をDropboxへ保存済みかも削除前に確認します。
 
 ## 8.8 独立review用worktree
 
@@ -979,7 +1015,11 @@ test → commit → push → PR/merge → main更新 → 各PCのworktree削除 
 
 ---
 
-# 10. データの置き場所
+# 10. 共有先とlocal-only領域
+
+## 原則
+
+永続化すべきfileについて、特定PCだけに存在する唯一のコピーを作りません。保存先は原則としてGitHubまたはDropboxです。
 
 ## GitHub
 
@@ -988,39 +1028,53 @@ test → commit → push → PR/merge → main更新 → 各PCのworktree削除 
 - tests
 - docs
 - `PROJECT.md`、`AGENTS.md`、`CLAUDE.md`
-- 小さなmetadataやschema
-- `environment.yml`
-- データ取得手順
+- `handoffs/CURRENT.md`
+- 小さなmetadata、schema、manifest、quality-control summary
+- `environment.yml`などの環境再構築情報
+- データ取得・再生成手順
+- version管理する価値がある小さな解析結果
+
+Agentが作業開始時に読むべきMarkdownや規約は、必ずGitへcommitしてtask branchへ含めます。GitHub上にだけ新しい版があり、task branchへ取り込まれていない場合はlocal worktreeから見えないため、必要に応じて`origin/main`をmergeします。
 
 ## Dropbox
 
-- 既存の共有研究データ
-- 論文やreference資料
-- 複数端末で共有する必要がある中規模データ
+- 共有研究data
+- 論文、supplement、reference資料
+- Gitへ入れない大容量file
+- PC間で継続するために必要な中間成果物
+- 再生成コストが高い成果物
+- 最終解析結果、figure元data、release候補
 
-Dropboxの既存directory構造は変更せず、projectから必要なsubpathだけ参照します。
+Dropboxの既存directory構造は変更せず、projectから必要なsubpathだけ`.local/data/`または`.local/output`へlinkします。
 
-## project固有local disk / HPC
+## local-onlyとして許容するもの
 
-- 数百GB以上のデータ
-- GPU処理用データ
-- 一時的な中間生成物
-- 再生成可能な大容量結果
-
-全端末共通の固定local rootは作りません。projectごとに絶対pathを `scripts/setup-local-links.sh` へ記述します。
-
-## scratch
-
-- trial output
-- cache
+- credential、token、secret
+- conda/mamba環境本体
+- downloaded package cache
 - temporary file
-- Agentが生成する作業途中の成果物
+- 再生成可能なscratch・cache
+- worktree folderと`.local/`のsymlink構造
+- 実行中processとAgent chat session
 
-標準path：
+標準local scratch：
 
 ```text
 ~/scratch/<Project>/<Workspace>/
 ```
+
+`.local/scratch`と、共有先を指定していない`.local/output`は、端末を替えると失われても再生成できるものだけに使います。
+
+## project固有local disk / HPC
+
+数百GB以上のdataやGPU/HPC処理の都合でlocal diskやHPCを使うことはあります。ただし、そこだけに永続成果物の唯一のコピーを置きません。
+
+- 入力dataの正本は可能な範囲でDropboxまたは正式な外部storageに置く。
+- local/HPC上のcopyは計算用replicaとして扱う。
+- 重要な中間・最終成果物はDropbox等へ回収する。
+- path、checksum、取得・再生成方法をGit管理文書へ記録する。
+
+全端末共通の固定local rootは作りません。PC固有pathが本当に必要な場合だけ、`~/.research_env`のproject固有環境変数を利用します。
 
 ---
 

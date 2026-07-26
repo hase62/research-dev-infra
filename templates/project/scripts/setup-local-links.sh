@@ -70,21 +70,27 @@ use_output_dir() {
 # -----------------------------------------------------------------------------
 # Project-specific data links
 #
-# Add only the Dropbox or arbitrary local directories needed by this project.
+# Add only the shared Dropbox directories needed by this project.
 # Keep Dropbox's existing directory structure unchanged.
-# There is intentionally no machine-wide LOCAL_ROOT.
+# This tracked script should reconstruct the same logical links on every PC.
 #
-# Cross-platform Dropbox examples:
+# Shared input examples:
 # link_data "$RESEARCH_ROOT/Papers/ExampleProject" papers
 # link_data "$LARGE_ROOT/ExampleData/processed" processed_data
 #
-# Optional machine-specific local paths:
-# WSL2:  link_data "/mnt/e/MyProject/raw" raw
-# macOS: link_data "/Volumes/ExternalSSD/MyProject/raw" raw
+# Persistent output shared across PCs (recommended):
+# use_output_dir "$LARGE_ROOT/ExampleProject/results/$WORKSPACE_NAME"
 #
-# Optional: persist working outputs outside the standard scratch area.
-# WSL2:  use_output_dir "/mnt/e/MyProject/results/$WORKSPACE_NAME"
-# macOS: use_output_dir "/Volumes/ExternalSSD/MyProject/results/$WORKSPACE_NAME"
+# If use_output_dir is omitted, .local/output points to local scratch and must
+# contain only reproducible/disposable working output.
+#
+# Rare machine-specific cache example. Define EXAMPLE_LOCAL_CACHE_ROOT in
+# ~/.research_env on only the relevant PC; do not hard-code a PC-specific path:
+# if [[ -n "${EXAMPLE_LOCAL_CACHE_ROOT:-}" ]]; then
+#   link_data "$EXAMPLE_LOCAL_CACHE_ROOT" local_cache
+# fi
+#
+# There is intentionally no machine-wide LOCAL_ROOT.
 # -----------------------------------------------------------------------------
 
 
@@ -92,3 +98,6 @@ echo "Local links configured for $PROJECT_NAME ($WORKSPACE_NAME):"
 echo "  data:    $PROJECT_ROOT/.local/data"
 echo "  scratch: $SCRATCH_DIR"
 echo "  output:  $OUTPUT_DIR"
+if [[ "$OUTPUT_DIR" == "$SCRATCH_ROOT/"* ]]; then
+  echo "  note:    output is local/disposable; use Dropbox for persistent shared results"
+fi

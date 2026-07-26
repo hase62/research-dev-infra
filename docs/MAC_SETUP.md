@@ -141,11 +141,25 @@ analysis-smoke-test Sepsis.Atlas
 code .
 ```
 
-## 10. Mac固有データ
+## 10. Mac固有の例外path
+
+通常のdataと永続outputはDropboxの共通rootを使うため、Mac固有pathは不要です。
 
 ```bash
-link_data "/Volumes/ExternalSSD/SepsisAtlas/data" local_data
-use_output_dir "/Volumes/ExternalSSD/SepsisAtlas/results/$WORKSPACE_NAME"
+link_data "$LARGE_ROOT/Sepsis/processed" processed
+use_output_dir "$LARGE_ROOT/Sepsis/results/$WORKSPACE_NAME"
 ```
 
-別PCで進行中taskを続ける場合は、移動元でcheckpoint commitをpushし、移動先で同じtask名の`new-worktree`を実行します。worktree folder自体はPC間で同期しません。詳細は[worktree運用](WORKTREES.md)を参照してください。
+外付けSSDを使うのは、共有不要かつ再生成可能なcacheや、計算用replicaに限る例外です。必要な場合は`~/.research_env`へ環境変数を設定し、tracked scriptへMac固有の絶対pathを直書きしません。
+
+```bash
+# ~/.research_env
+export SEPSIS_LOCAL_CACHE_ROOT="/Volumes/ExternalSSD/SepsisAtlas/cache"
+
+# scripts/setup-local-links.sh
+if [[ -n "${SEPSIS_LOCAL_CACHE_ROOT:-}" ]]; then
+  link_data "$SEPSIS_LOCAL_CACHE_ROOT" local_cache
+fi
+```
+
+別PCで進行中taskを続ける場合は、code・Markdown指示・handoffをcheckpoint commitとしてGitHubへpushし、大きな中間・最終outputをDropboxへ保存します。移動先では同じtask名の`new-worktree`を実行します。worktree folder自体はPC間で同期しません。詳細は[worktree運用](WORKTREES.md)を参照してください。

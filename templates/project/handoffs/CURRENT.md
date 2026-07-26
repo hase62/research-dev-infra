@@ -23,6 +23,12 @@ TODO
 
 - TODO
 
+## Shared files and output locations
+
+- Git branch / commit: TODO
+- Dropbox or other shared output paths: TODO
+- Local-only scratch that can be regenerated: TODO
+
 ## Important files and caveats
 
 - TODO

@@ -89,22 +89,27 @@ source ~/.zshrc
 4. WSL2では `~/.bashrc`、macOSでは `~/.zshrc`から読み込む設定を追加
 5. `~/.local/bin`へ共通commandを登録
 
-## project固有のローカルデータ
+## projectの共有dataとoutput
 
-machine全体の `LOCAL_ROOT` は定義しません。必要なprojectだけ `scripts/setup-local-links.sh` に追加します。
+machine全体の `LOCAL_ROOT` は定義しません。通常はDropboxの共通論理rootを使い、どのPCでも同じ`scripts/setup-local-links.sh`からlinkを再構築します。
 
 ```bash
-# Dropbox共通論理root
 link_data "$RESEARCH_ROOT/Papers/ProteomicAging" papers
 link_data "$LARGE_ROOT/Proteomics/PublicData" public_data
+use_output_dir "$LARGE_ROOT/ProteomicAging/results/$WORKSPACE_NAME"
+```
 
-# WSL2固有例
-link_data "/mnt/e/ProteomicAging/raw" raw
-use_output_dir "/mnt/e/ProteomicAging/results/$WORKSPACE_NAME"
+PC固有pathは、共有不要かつ再生成可能なcacheなどに限る例外です。その場合もtracked scriptへ絶対pathを直書きせず、`~/.research_env`のproject固有環境変数を使います。
 
-# macOS固有例
-link_data "/Volumes/ExternalSSD/ProteomicAging/raw" raw
-use_output_dir "/Volumes/ExternalSSD/ProteomicAging/results/$WORKSPACE_NAME"
+```bash
+# ~/.research_env（各PCで必要な場合だけ設定）
+export PROTEOMIC_AGING_LOCAL_CACHE_ROOT="/mnt/e/ProteomicAging/cache"  # WSL2例
+# export PROTEOMIC_AGING_LOCAL_CACHE_ROOT="/Volumes/ExternalSSD/ProteomicAging/cache"  # macOS例
+
+# scripts/setup-local-links.sh（Git管理）
+if [[ -n "${PROTEOMIC_AGING_LOCAL_CACHE_ROOT:-}" ]]; then
+  link_data "$PROTEOMIC_AGING_LOCAL_CACHE_ROOT" local_cache
+fi
 ```
 
 ## Agentとeditor

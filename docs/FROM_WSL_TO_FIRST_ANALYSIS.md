@@ -261,4 +261,4 @@ git commit -m "WIP: checkpoint current task"
 git push
 ```
 
-別PCでは同じtask名で`new-worktree`を実行し、GitHub上のtask branchからlocal worktreeを再構築します。未commit変更、`.local`、conda環境、`~/scratch`、Agent chat sessionは移動しません。
+別PCでは同じtask名で`new-worktree`を実行し、GitHub上のtask branchからlocal worktreeを再構築します。大きなdataと必要なoutputはDropboxから参照します。未commit変更、`.local`のlinkそのもの、conda環境、再生成可能な`~/scratch`、Agent chat sessionは移動しません。
