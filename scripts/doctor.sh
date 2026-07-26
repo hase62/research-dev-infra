@@ -31,7 +31,7 @@ for command_name in git bash curl; do
   fi
 done
 
-for command_name in gh conda mamba codex claude code; do
+for command_name in gh conda mamba codex claude code emacs; do
   if command -v "$command_name" >/dev/null 2>&1; then
     ok "$command_name: $(command -v "$command_name")"
   else

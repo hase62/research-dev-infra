@@ -23,3 +23,16 @@ code .
 ```
 
 Confirm that the lower-left corner shows a WSL connection. Use the integrated terminal to run `codex` or `claude`. When one service reaches its usage limit, stop it and start the other in the same worktree. Read `handoffs/CURRENT.md`, `git status`, and `git diff` before continuing.
+
+## Edit with Emacs
+
+From WSL2:
+
+```bash
+cd ~/src/__PROJECT_NAME__
+e PROJECT.md
+```
+
+`e` is installed by `setup-emacs` and opens terminal Emacs. VS Code and Emacs
+can be used for the same repository, but do not edit the same file in both at
+the same time.

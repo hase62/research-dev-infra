@@ -71,3 +71,15 @@ projectを作成してdata linkと解析環境を準備した後：
 ```bash
 analysis-smoke-test <ProjectName>
 ```
+
+## Optional editor and research-grade agent defaults
+
+After `setup-machine.sh` has registered commands:
+
+```bash
+setup-agent-defaults
+setup-emacs
+```
+
+The standard agent defaults are Codex GPT-5.6 with xhigh reasoning and Claude
+Code `opus` with xhigh effort. `setup-emacs` installs terminal Emacs for WSL2.

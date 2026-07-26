@@ -103,6 +103,8 @@ ln -sfnT "$INFRA_ROOT/scripts/install-agents.sh" "$HOME/.local/bin/install-codin
 ln -sfnT "$INFRA_ROOT/scripts/install-miniforge.sh" "$HOME/.local/bin/install-miniforge"
 ln -sfnT "$INFRA_ROOT/scripts/analysis-smoke-test.sh" "$HOME/.local/bin/analysis-smoke-test"
 ln -sfnT "$INFRA_ROOT/scripts/setup-vscode.sh" "$HOME/.local/bin/setup-vscode"
+ln -sfnT "$INFRA_ROOT/scripts/setup-agent-defaults.sh" "$HOME/.local/bin/setup-agent-defaults"
+ln -sfnT "$INFRA_ROOT/scripts/setup-emacs.sh" "$HOME/.local/bin/setup-emacs"
 
 PATH_LINE='export PATH="$HOME/.local/bin:$PATH"'
 if ! grep -Fqx "$PATH_LINE" "$HOME/.bashrc" 2>/dev/null; then
@@ -117,6 +119,8 @@ echo
 echo "Run: source ~/.bashrc"
 echo "Then: hash -r && research-doctor"
 echo "After installing Windows Visual Studio Code: setup-vscode"
+echo "Configure research-grade agent defaults: setup-agent-defaults"
+echo "Optional terminal editor: setup-emacs"
 echo
 echo "Project-specific local disks are optional and are linked in each project's"
 echo "scripts/setup-local-links.sh; no global local-data directory is required."

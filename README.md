@@ -1,6 +1,6 @@
 # research-dev-infra
 
-WSL2、GitHub、Visual Studio Code、Codex、Claude Code、Miniforge、既存Dropboxデータを併用し、複数の研究プロジェクトをできるだけ簡単に開始・継続するための共通基盤です。
+WSL2、GitHub、Visual Studio Code、Emacs、Codex、Claude Code、Miniforge、既存Dropboxデータを併用し、複数の研究プロジェクトをできるだけ簡単に開始・継続するための共通基盤です。
 
 このREADMEを、**WSL2をインストールした直後から最初の解析を始めるまでの標準手順書**として使用します。
 
@@ -14,6 +14,7 @@ WSL2、GitHub、Visual Studio Code、Codex、Claude Code、Miniforge、既存Dro
 - 必要なDropboxまたはローカルデータだけを、各projectの `.local/data/` にsymlinkする。
 - 大規模データ本体や解析中の出力はGitHubへ入れない。
 - Visual Studio Codeを共通の編集、Git差分確認、統合terminal、notebook実行の画面として使う。
+- EmacsはWSL2 terminal内の軽量editorとして併用できる。
 - CodexとClaude Codeは両方を導入し、対象project repositoryまたは専用worktreeの中から起動する。
 - どちらかの定額プランの利用上限に達したら、同じtask worktreeで停止し、もう一方へ順次切り替える。
 - 同じworking treeをCodexとClaude Codeに同時編集させない。
@@ -49,11 +50,11 @@ WSL2、GitHub、Visual Studio Code、Codex、Claude Code、Miniforge、既存Dro
 └── data-roots/
     ├── Research
     │   -> /mnt/c/Users/<WindowsUser>/Dropbox/Research
-    ├── ForShareLargeData
-    │   -> /mnt/c/Users/<WindowsUser>/Dropbox/ForShareLargeData
-    └── LocalLarge
-        -> /mnt/d/ResearchLocal など
+    └── ForShareLargeData
+        -> /mnt/c/Users/<WindowsUser>/Dropbox/ForShareLargeData
 ```
+
+PC全体で共通の大容量ローカルディスクは定義しません。必要なprojectだけが、任意の `/mnt/d/...`、`/mnt/e/...`、外付けSSD、HPC mountなどを直接参照します。
 
 各projectは次の最小構成を持ちます。
 
@@ -64,20 +65,22 @@ WSL2、GitHub、Visual Studio Code、Codex、Claude Code、Miniforge、既存Dro
 ├── CLAUDE.md
 ├── README.md
 ├── .vscode/
-│   └── extensions.json     # 推奨extension
+│   └── extensions.json
 ├── analysis/
 ├── docs/
 ├── tasks/
 ├── tests/
 ├── handoffs/
-│   └── CURRENT.md          # Codex/Claude間の短い引継ぎ
+│   └── CURRENT.md
 ├── scripts/
 │   └── setup-local-links.sh
 └── .local/                 # Git管理しない
     ├── data/               # 必要な入力データへのsymlink
-    ├── scratch/            # WSL2内のtask用一時領域
-    └── output/             # PCローカルの作業成果物
+    ├── scratch/            # task用一時領域
+    └── output/             # task用working output
 ```
+
+標準ではscratchとoutputは `~/scratch/<Project>/<Workspace>/` 以下です。外部ディスクへ置きたいprojectだけ `use_output_dir` で差し替えます。
 
 ---
 
@@ -285,7 +288,7 @@ gh repo view --json url --jq '.url'
 
 ---
 
-## 7. Dropboxとローカル大容量領域を設定する
+## 7. Dropboxの共通参照ルートを設定する
 
 本構成は、Dropbox内の次の2ルートを既存構造のまま参照します。
 
@@ -294,26 +297,11 @@ C:\Users\<WindowsUser>\Dropbox\Research
 C:\Users\<WindowsUser>\Dropbox\ForShareLargeData
 ```
 
-PC固有の大容量データは、例として次へ置きます。
-
-```text
-D:\ResearchLocal
-```
-
-WSL2側で作成します。
-
-```bash
-mkdir -p /mnt/d/ResearchLocal
-```
-
 マシン設定を実行します。
 
 ```bash
 cd ~/src/research-dev-infra
-
-bash scripts/setup-machine.sh \
-  --local-root /mnt/d/ResearchLocal
-
+bash scripts/setup-machine.sh
 source ~/.bashrc
 ```
 
@@ -322,17 +310,7 @@ Windowsユーザー名やDropbox位置を自動検出できない場合：
 ```bash
 bash scripts/setup-machine.sh \
   --windows-user <WindowsUser> \
-  --dropbox-home "/mnt/c/Users/<WindowsUser>/Dropbox" \
-  --local-root /mnt/d/ResearchLocal
-
-source ~/.bashrc
-```
-
-Dドライブを使わないPCでは、WSL2内に作ることもできます。
-
-```bash
-bash scripts/setup-machine.sh \
-  --local-root "$HOME/local-large"
+  --dropbox-home "/mnt/c/Users/<WindowsUser>/Dropbox"
 
 source ~/.bashrc
 ```
@@ -347,23 +325,39 @@ research-doctor
 
 `~/.research_env`はPC固有ファイルです。GitHubやDropboxで同期しません。
 
+`setup-machine.sh`はローカルSSDや外付けディスクを作成・登録しません。それらはprojectごとに必要性も場所も異なるため、各projectの `scripts/setup-local-links.sh` で直接指定します。
+
 ---
 
 ## 8. Visual Studio CodeをWindowsへ導入する
 
 このworkflowでは、**Windows版Visual Studio Codeを画面として使い、処理はWSL2内で実行**します。VS Code本体をUbuntuへaptで入れません。
 
-Windows PowerShellで次を実行します。
+Windows PowerShellで次を実行します。新規導入の場合：
 
 ```powershell
 winget install --id Microsoft.VisualStudioCode -e
 ```
 
-インストール後、Ubuntu terminalを一度閉じて開き直し、確認します。
+既に導入済みの場合は、拡張機能との互換性問題を避けるため更新します。
+
+```powershell
+winget upgrade --id Microsoft.VisualStudioCode -e
+```
+
+VS Codeを更新した後は、開いているVS Code windowをすべて閉じ、Windows PowerShellでWSLを停止します。
+
+```powershell
+wsl --shutdown
+```
+
+Ubuntuを開き直し、確認します。
 
 ```bash
 code --version
 ```
+
+このinfraの `setup-vscode` は、現在のClaude Code extensionが要求する **VS Code 1.98.0以上**を共通の最低条件として検査します。1.98.0未満なら、extensionの導入を始めずに更新手順を表示して停止します。
 
 続いて、公式のWSL、Codex、Claude Codeと、解析用のPython、Jupyter、R extensionを導入します。
 
@@ -372,8 +366,7 @@ code --version
 ```bash
 cd ~/src/research-dev-infra
 
-bash scripts/setup-machine.sh \
-  --local-root /mnt/d/ResearchLocal
+bash scripts/setup-machine.sh
 
 source ~/.bashrc
 hash -r
@@ -381,7 +374,7 @@ command -v setup-vscode
 setup-vscode
 ```
 
-Dドライブを使わないPCでは、初回に指定したものと同じ`--local-root`を指定します。command登録前でも、scriptを直接実行できます。
+command登録前でも、scriptを直接実行できます。
 
 ```bash
 cd ~/src/research-dev-infra
@@ -422,6 +415,42 @@ setup-vscode
 ```
 
 CodexとClaude CodeのVS Code extensionおよびCLIは、それぞれ別のサービス、認証、利用上限を持ちます。このinfraは残量を自動判定しません。一方が利用上限を通知したら、同じworktreeでそのsessionを停止し、もう一方へ手動で切り替えます。
+
+
+### Emacsを併用する
+
+VS Codeに加えて、WSL2 terminal内のeditorとしてEmacsを使用できます。標準ではGUI依存のない `emacs-nox` を導入します。
+
+```bash
+setup-emacs
+```
+
+確認文字列を求められたら次を入力します。
+
+```text
+EMACS
+```
+
+利用例：
+
+```bash
+cd ~/src/research-dev-infra
+e README.md
+```
+
+または：
+
+```bash
+emacs -nw README.md
+```
+
+Windows 11のWSLgでGUI版を使う場合だけ、次を使用します。
+
+```bash
+setup-emacs --gui
+```
+
+VS CodeとEmacsは同じrepositoryで併用できます。ただし、同じfileを両方で同時編集しません。CodexとClaude Codeは、どちらのeditorを使う場合も対象projectまたはworktreeのterminalから起動します。
 
 ---
 
@@ -480,166 +509,100 @@ CLIはVS Codeの統合terminalから起動できます。VS Code extensionを使
 
 現在の `scripts/install-agents.sh` は、Codex installerを非対話モードで実行するため、installer内からCodexを自動起動しません。インストール後のCodexとClaude Codeは、実際の研究repositoryに移動してから手動で起動します。
 
-### WSL2上でCodexとClaude Codeへログインする
 
-インストール後、各PCのWSL2環境でCodexとClaude Codeへ一度ずつログインします。定額プランを使う場合は、APIキーではなくブラウザ経由のアカウント認証を選びます。
+### WSL2上でログインする
 
-この構成で想定する認証は次のとおりです。
-
-- Codex：ChatGPT Businessで利用しているChatGPTアカウント
-- Claude Code：Claude ProまたはMaxで利用しているClaudeアカウント
-
-#### APIキーが設定されていないか確認する
-
-定額プランだけを利用する場合、通常は `OPENAI_API_KEY` と `ANTHROPIC_API_KEY` を設定する必要はありません。値そのものを表示せず、設定の有無だけを確認します。
+定額プランを使用する場合はAPI keyではなく、各サービスのbrowser認証を使用します。まずAPI keyがshellへ設定されていないことを確認します。
 
 ```bash
-[[ -n "${OPENAI_API_KEY:-}" ]] \
-  && echo "OPENAI_API_KEY is set" \
-  || echo "OPENAI_API_KEY is not set"
-
-[[ -n "${ANTHROPIC_API_KEY:-}" ]] \
-  && echo "ANTHROPIC_API_KEY is set" \
-  || echo "ANTHROPIC_API_KEY is not set"
+[[ -n "${OPENAI_API_KEY:-}" ]] && echo "OPENAI_API_KEY is set" || echo "OPENAI_API_KEY is not set"
+[[ -n "${ANTHROPIC_API_KEY:-}" ]] && echo "ANTHROPIC_API_KEY is set" || echo "ANTHROPIC_API_KEY is not set"
 ```
 
-定額プランのみを使う場合は、基本的に両方とも `not set` で構いません。特に `ANTHROPIC_API_KEY` が設定されていると、Claude CodeはClaude Pro／Maxの利用枠ではなくAPI従量課金を使用します。
-
-現在のterminalだけから一時的に外す場合：
-
-```bash
-unset OPENAI_API_KEY
-unset ANTHROPIC_API_KEY
-```
-
-設定ファイルに書かれていないか確認します。APIキー本体を画面に表示するコマンドは使用しません。
-
-```bash
-grep -nE 'OPENAI_API_KEY|ANTHROPIC_API_KEY' \
-  ~/.bashrc ~/.profile ~/.research_env 2>/dev/null
-```
-
-不要な `export OPENAI_API_KEY=...` または `export ANTHROPIC_API_KEY=...` があれば、その行を削除してterminalを開き直します。
-
-#### Codexへログインする
-
-WSL2のUbuntu terminalで実行します。
+Codex：
 
 ```bash
 codex login
 ```
 
-初回は単に次を実行しても、ログイン手順が始まります。
+表示された認証画面で `Sign in with ChatGPT` を選び、ChatGPT Businessで使用するaccountとworkspaceへログインします。browserが自動で開かない場合は、表示されたURLをWindows側browserで開きます。
 
-```bash
-codex
-```
-
-表示された認証方法では、ChatGPTアカウントでのサインインを選びます。ブラウザが自動で開かない場合は、terminalに表示されたURLをWindows側のChromeまたはEdgeへ貼り付けます。
-
-ChatGPTの個人workspaceとBusiness workspaceの両方に所属している場合は、Codexを使用するBusiness workspaceを選びます。
-
-ログイン後、対象projectから起動します。
-
-```bash
-cd ~/src/<Project>
-codex
-```
-
-Codex画面を終了するには、Codex内で次を入力します。
-
-```text
-/exit
-```
-
-または `Ctrl+C` を使用します。
-
-ログインをやり直す場合：
-
-```bash
-codex logout
-codex login
-```
-
-通常のブラウザcallbackがうまく動かない場合は、device認証を試します。
-
-```bash
-codex login --device-auth
-```
-
-#### Claude Codeへログインする
-
-WSL2のUbuntu terminalで起動します。
+Claude Code：
 
 ```bash
 claude
 ```
 
-初回起動時に認証方法が表示されたら、Claude ProまたはMaxを契約しているClaudeアカウントでログインします。ブラウザが自動で開かなければ、表示されたURLをWindows側ブラウザへ貼り付けます。
+初回認証でClaude ProまたはMaxを契約しているClaude accountへログインします。認証状態はClaude Code内の `/status` で確認します。
 
-Claude Code内で認証状態と利用状況を確認します。
+### 研究計算用の標準modelとeffortを設定する
 
-```text
-/status
-```
-
-Claude Consoleの従量課金アカウントでログイン済みの場合は、Claude Code内で次を実行し、Pro／Maxのサブスクリプションアカウントへ切り替えます。
+このinfraの標準は次です。
 
 ```text
-/login
+Codex       GPT-5.6   xhigh
+Claude Code opus      xhigh
 ```
 
-認証をやり直す場合は、Claude Code内のcommandまたはshell commandを使用します。
+設定します。
 
-Claude Code内：
+```bash
+setup-agent-defaults
+```
+
+確認文字列を求められたら次を入力します。
 
 ```text
-/logout
+AGENTS
 ```
 
-Ubuntu shell：
+このcommandは次を設定し、既存設定はtimestamp付きでbackupします。
+
+Codex `~/.codex/config.toml`：
+
+```toml
+model = "gpt-5.6"
+model_reasoning_effort = "xhigh"
+plan_mode_reasoning_effort = "xhigh"
+```
+
+Claude Code `~/.claude/settings.json`：
+
+```json
+{
+  "model": "opus",
+  "effortLevel": "xhigh"
+}
+```
+
+Claude Codeは最新版へ更新します。
 
 ```bash
 claude update
-```
-
-terminalを完全に閉じて開き直した後、再度起動します。
-
-```bash
-claude
-```
-
-定額プランの利用枠だけを使い、APIクレジットへの切り替えを避ける場合は、上限到達時に表示されるAPIクレジット利用の提案を選択せず、もう一方のagentへ切り替えるか、利用枠のリセットを待ちます。
-
-#### VS Code extensionでも同じアカウントを使う
-
-CodexおよびClaude CodeのVS Code extensionを使用する場合も、CLIと同じChatGPT／Claudeアカウントでログインします。CLIとIDE extensionは別々にログインを求める場合がありますが、同じ定額プランの利用枠に紐づきます。
-
-まずCLIでログインを済ませ、その後、対象projectをWSL接続のVS Codeで開く運用を推奨します。
-
-```bash
-cd ~/src/<Project>
-code .
-```
-
-VS Code左下に `WSL: Ubuntu` が表示され、統合terminalの `pwd` が `/home/<user>/src/<Project>` またはworktreeを指していることを確認します。
-
-#### ログイン確認の最小チェック
-
-```bash
-codex --version
 claude --version
 ```
 
-それぞれ一度起動して、認証エラーが出ないことを確認します。
+Claude Code v2.1.219以降では、Anthropic APIの `opus` aliasはOpus 5へ解決されます。起動後に確認します。
 
-```bash
-codex
-# 終了後
-claude
+```text
+/status
+/model
+/effort
 ```
 
-PCごとのWSL2環境で一度ずつログインします。認証ファイルをDropboxやGitHubへコピーしません。
+pickerが古いOpusを表示する場合でも、最新版へ更新後に直接指定できます。
+
+```bash
+claude --model claude-opus-5 --effort xhigh
+```
+
+`max`はpersistent defaultにせず、特に難しいtaskだけsession単位で使用します。
+
+```bash
+claude --model opus --effort max
+```
+
+Codexではsession中の `/model` から一時的にeffortを変更できます。
 
 ### 古いscriptで `Start Codex now? [y/N]` に `y` と答えた場合
 
@@ -685,7 +648,6 @@ research-doctor
 - Git / curl / bash
 - GitHub CLIの認証
 - Dropboxの2ルート
-- LocalLarge
 - `~/src` / `~/worktrees` / `~/scratch`
 - Miniforge / conda / mamba
 - Codex / Claude Code
@@ -792,7 +754,18 @@ nano scripts/setup-local-links.sh
 ```bash
 link_data "$RESEARCH_ROOT/Papers/Aging/Proteomics" papers
 link_data "$LARGE_ROOT/Proteomics/PublicData" public_data
-link_data "$LOCAL_ROOT/ProteomicAging/large_objects" large_objects
+```
+
+project固有のローカルSSDや外付けディスクが必要な場合は、その実パスを直接指定します。
+
+```bash
+link_data "/mnt/e/ProteomicAging/large_objects" large_objects
+```
+
+working outputも外部ディスクへ置きたいprojectだけ、次を追加します。
+
+```bash
+use_output_dir "/mnt/e/ProteomicAging/results/$WORKSPACE_NAME"
 ```
 
 実際のDropbox構造に合わせて変更します。Dropbox内をprojectごとに再編成する必要はありません。
@@ -1007,6 +980,37 @@ DropboxのForShareLargeData root
 
 Agentに見せるデータは `.local/data/` 以下に限定します。
 
+
+### Plan Modeの標準的な使い方
+
+Plan Modeはmodelやeffortとは別の機能です。fileを編集する前にrepository、入力、既存実装を調査し、変更案を提示させるために使用します。
+
+Codex：
+
+1. `codex`を起動する。
+2. `Shift+Tab`でPlan Modeへ切り替える。
+3. 目的、制約、検証条件を伝える。
+4. 提示されたplanを修正・承認する。
+5.通常modeへ戻し、承認したplanを実装させる。
+
+このinfraでは通常modeとPlan Modeの両方を `xhigh` に設定します。
+
+Claude Code：
+
+```text
+/plan
+```
+
+または `Shift+Tab`でPlan Modeへ切り替えます。Claudeはfileを読み、非破壊的な調査commandを実行してplanを作りますが、planを承認するまでsourceを編集しません。
+
+最初からPlan Modeで起動する場合：
+
+```bash
+claude --permission-mode plan
+```
+
+`opusplan`はPlan Modeそのものではありません。Plan Mode中はOpus、実装時はSonnetへ自動切替するmodel aliasです。このinfraでは実装時も科学的判断を前提とするため、標準には `opus` を使用し、必要な時だけ `/plan` へ切り替えます。
+
 ### 最初の依頼例
 
 ```text
@@ -1158,7 +1162,7 @@ git push
 
 未commit、未pushの状態で別PCへ移らないことを原則とします。
 
-データ本体はGitHubではなく、Dropbox、LocalLarge、HPCのいずれかにあります。別PCで同じデータが必要なら、そのPCでも `.local/data/` のlink先を設定します。
+データ本体はGitHubではなく、Dropbox、project固有のローカルディスク、HPCなどにあります。別PCで同じデータが必要なら、そのPCでも `.local/data/` のlink先を設定します。
 
 ---
 
@@ -1305,7 +1309,7 @@ branchが未mergeなら、Gitが安全のため削除を拒否することがあ
 - Codex／Claude Codeのログイン
 - Miniforge環境
 - `~/.research_env`
-- DropboxとLocalLargeへのsymlink
+- Dropbox共通ルートへのsymlink
 - 各projectの `.local/`
 
 認証情報、conda環境本体、`.local/`をDropboxやGitHubで同期しません。
@@ -1365,10 +1369,7 @@ gh repo clone <GitHubAccount>/research-dev-infra
 
 ```bash
 cd ~/src/research-dev-infra
-
-bash scripts/setup-machine.sh \
-  --local-root /mnt/d/ResearchLocal
-
+bash scripts/setup-machine.sh
 source ~/.bashrc
 
 # Windows側にVisual Studio Codeを導入後
@@ -1383,7 +1384,7 @@ source ~/.bashrc
 research-doctor
 ```
 
-Dropboxの位置やLocalLargeのドライブが1台目と異なっても構いません。`setup-machine.sh`の引数でそのPCの実パスを指定します。
+Dropboxの位置が1台目と異なる場合は、`--dropbox-home`でそのPCの実パスを指定します。project固有のローカルディスクはmachine setupでは登録しません。
 
 ---
 
@@ -1455,13 +1456,9 @@ Dropbox上の入力ファイルは、原則として読み取り専用として�
 
 ---
 
-## 31. LocalLargeに置くもの
+## 31. project固有のローカルディスクに置くもの
 
-```text
-D:\ResearchLocal
-```
-
-または各PCで指定した大容量領域です。
+PC全体で固定の保存先や名前は決めません。研究ごとに必要なら、内蔵SSD、外付けSSD、別ドライブなどの任意の場所を使います。
 
 主な用途：
 
@@ -1473,11 +1470,19 @@ D:\ResearchLocal
 - model checkpoint
 - PC固有の作業結果
 
-projectからは次の形式でlinkします。
+projectからは実パスを直接linkします。
 
 ```bash
-link_data "$LOCAL_ROOT/<Project>/raw" raw
+link_data "/mnt/e/<Project>/raw" raw
 ```
+
+working outputをそこへ置く場合：
+
+```bash
+use_output_dir "/mnt/e/<Project>/results/$WORKSPACE_NAME"
+```
+
+ローカル大容量領域を使わないprojectでは何も設定しません。
 
 ---
 
@@ -1513,12 +1518,19 @@ git pull --rebase
 setup scriptやcommand symlinkが増えた場合は、再度実行します。
 
 ```bash
-bash scripts/setup-machine.sh \
-  --local-root /mnt/d/ResearchLocal
-
+bash scripts/setup-machine.sh
 source ~/.bashrc
 research-doctor
 ```
+
+旧版で `LOCAL_ROOT` / `LocalLarge` を設定していた場合も、この再実行で `~/.research_env` は新形式へ更新されます。旧版から作成済みのprojectで `scripts/setup-local-links.sh` に `$LOCAL_ROOT` が残っている場合は、任意の実パスへ置き換えます。
+
+```bash
+link_data "/mnt/e/<Project>/raw" raw
+use_output_dir "/mnt/e/<Project>/results/$WORKSPACE_NAME"
+```
+
+ローカル大容量領域が不要なprojectでは、その行を削除するだけです。
 
 ---
 
@@ -1563,7 +1575,7 @@ cat ~/.research_env
 
 ```bash
 cd ~/src/research-dev-infra
-bash scripts/setup-machine.sh --local-root /mnt/d/ResearchLocal
+bash scripts/setup-machine.sh
 source ~/.bashrc
 ```
 
@@ -1582,8 +1594,7 @@ Dropboxの実際の場所が異なる場合：
 
 ```bash
 bash scripts/setup-machine.sh \
-  --dropbox-home "/mnt/c/実際の/Dropbox" \
-  --local-root /mnt/d/ResearchLocal
+  --dropbox-home "/mnt/c/実際の/Dropbox"
 ```
 
 ---
@@ -1679,7 +1690,7 @@ push前なら、Gitのindexから外します。
 git rm --cached <large-file>
 ```
 
-`.gitignore`へ追加してcommitし直します。既にpushした大容量fileの履歴削除は別途対応が必要です。研究データは原則として `.local/`、Dropbox、LocalLarge、HPCへ置きます。
+`.gitignore`へ追加してcommitし直します。既にpushした大容量fileの履歴削除は別途対応が必要です。研究データは原則として `.local/`、Dropbox、project固有のローカルディスク、HPCへ置きます。
 
 ---
 
@@ -1690,8 +1701,7 @@ git rm --cached <large-file>
 ```bash
 cd ~/src/research-dev-infra
 
-bash scripts/setup-machine.sh \
-  --local-root /mnt/d/ResearchLocal
+bash scripts/setup-machine.sh
 
 source ~/.bashrc
 hash -r
@@ -1747,7 +1757,52 @@ code .
 
 VS Code左下にWSL接続が表示され、terminalのpromptが `/home/<user>/src/<Project>` を指していることを確認します。
 
-## 45. CodexまたはClaude Codeの利用上限に達した
+## 45. extensionが「VS Codeのversionと互換性がない」と表示される
+
+例：
+
+```text
+Can't install ... because it is not compatible with the current version of Visual Studio Code
+```
+
+WSL側の `code --version` が古い場合に発生します。Windows版VS Codeと、WSL内で動くVS Code Serverは対応するversionで動作するため、Ubuntu側だけを更新しても解決しません。
+
+まず確認します。
+
+```bash
+code --version
+```
+
+1.98.0未満なら、VS Codeをすべて閉じ、Windows PowerShellで更新します。
+
+```powershell
+winget upgrade --id Microsoft.VisualStudioCode -e
+wsl --shutdown
+```
+
+更新候補が見つからない場合：
+
+```powershell
+winget install --id Microsoft.VisualStudioCode -e
+wsl --shutdown
+```
+
+Ubuntuを開き直して確認し、再実行します。
+
+```bash
+code --version
+setup-vscode
+```
+
+新しいWindows版VS Codeへ更新しても古いWSL Serverが残る場合は、VS Codeをすべて閉じた状態で、古いversionのdirectoryだけを削除して `code .` を再実行します。通常は `wsl --shutdown` と再接続だけで自動更新されるため、手動削除は最後の手段です。
+
+```bash
+ls ~/.vscode-server/bin
+```
+
+今回の `setup-vscode` は、最低version未満ならextension導入前に停止し、extensionごとの失敗も集計して非zeroで終了します。失敗があったのに `VS Code setup completed successfully` と表示することはありません。
+
+## 46. CodexまたはClaude Codeの利用上限に達した
 
 障害ではありません。現在のagentを停止し、同じworktreeのまま次を実行します。
 
@@ -1768,38 +1823,6 @@ codex
 
 ---
 
-## 46. CodexまたはClaude CodeがAPI課金で動いているように見える
-
-まず環境変数の有無だけを確認します。
-
-```bash
-[[ -n "${OPENAI_API_KEY:-}" ]] && echo "OPENAI_API_KEY is set"
-[[ -n "${ANTHROPIC_API_KEY:-}" ]] && echo "ANTHROPIC_API_KEY is set"
-```
-
-定額プランのみを使う場合は、不要なAPIキーを現在のshellから外します。
-
-```bash
-unset OPENAI_API_KEY ANTHROPIC_API_KEY
-```
-
-Claude Codeでは `ANTHROPIC_API_KEY` があるとAPI認証が優先されます。Claude Code内で `/logout`、Ubuntu shellで `claude update`を実行し、terminalを再起動してからClaude Pro／Maxのアカウントで入り直します。
-
-```bash
-claude
-```
-
-CodexもChatGPTアカウントで入り直します。
-
-```bash
-codex logout
-codex login
-```
-
-APIキーを `.bashrc`、`.profile`、`.research_env`、project内の `.env` へ保存していないか確認します。キーの値をterminalやGitHubへ表示・commitしないでください。
-
----
-
 # Part XI. 提供コマンド一覧
 
 | コマンド | 用途 |
@@ -1811,6 +1834,8 @@ APIキーを `.bashrc`、`.profile`、`.research_env`、project内の `.env` へ
 | `research-doctor` | WSL2、GitHub、Dropbox、Agent環境を点検 |
 | `install-coding-agents` | CodexとClaude Codeを公式installerで導入 |
 | `setup-vscode` | VS Codeの公式WSL、Codex、Claude Code、解析extensionを導入 |
+| `setup-agent-defaults` | Codex GPT-5.6/xhighとClaude Opus/xhighを標準設定 |
+| `setup-emacs` | WSL2へterminal Emacsを導入 |
 | `install-miniforge` | WSL2内へMiniforgeを導入 |
 | `analysis-smoke-test` | projectのGit、data link、scratch、Python/Rを確認 |
 
@@ -1823,6 +1848,8 @@ remove-worktree --help
 install-miniforge --help
 install-coding-agents --help
 setup-vscode --help
+setup-agent-defaults --help
+setup-emacs --help
 ```
 
 ---
@@ -1871,4 +1898,7 @@ READMEを標準手順書とし、詳細な背景や補足は `docs/` を参照�
 - [OpenAI Codex documentation](https://developers.openai.com/codex/)
 - [OpenAI Codex VS Code extension](https://marketplace.visualstudio.com/items?itemName=OpenAI.chatgpt)
 - [Claude Code documentation](https://code.claude.com/docs/en/setup)
+- [Claude Code model configuration](https://code.claude.com/docs/en/model-config)
+- [Claude Code permission modes](https://code.claude.com/docs/en/permission-modes)
+- [GNU Emacs manual](https://www.gnu.org/software/emacs/manual/emacs.html)
 - [Claude Code in VS Code](https://code.claude.com/docs/en/vs-code)
