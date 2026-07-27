@@ -6,7 +6,7 @@ Read `handoffs/CURRENT.md` before starting.
 
 - Operate from this repository root.
 - Access Dropbox only through:
-  - `workspace/research-inout/`
+  - `workspace/research-input/`
   - `workspace/research-output/`
   - `workspace/large-input/`
   - `workspace/large-output/`

@@ -14,7 +14,7 @@ fi
 source "$HOME/.research_env"
 
 for variable_name in \
-  AICODE_RESEARCH_INOUT_ROOT \
+  AICODE_RESEARCH_INPUT_ROOT \
   AICODE_RESEARCH_OUTPUT_ROOT \
   AICODE_LARGE_INPUT_ROOT \
   AICODE_LARGE_OUTPUT_ROOT \
@@ -53,14 +53,14 @@ else
   WORKSPACE_NAME="$(basename "$PROJECT_ROOT")"
 fi
 
-RESEARCH_INOUT_DIR="$AICODE_RESEARCH_INOUT_ROOT/$PROJECT_NAME"
+RESEARCH_INPUT_DIR="$AICODE_RESEARCH_INPUT_ROOT/$PROJECT_NAME"
 RESEARCH_OUTPUT_DIR="$AICODE_RESEARCH_OUTPUT_ROOT/$PROJECT_NAME"
 LARGE_INPUT_DIR="$AICODE_LARGE_INPUT_ROOT/$PROJECT_NAME"
 LARGE_OUTPUT_DIR="$AICODE_LARGE_OUTPUT_ROOT/$PROJECT_NAME"
 SCRATCH_DIR="$SCRATCH_ROOT/$PROJECT_NAME/$WORKSPACE_NAME"
 
 mkdir -p \
-  "$RESEARCH_INOUT_DIR" \
+  "$RESEARCH_INPUT_DIR" \
   "$RESEARCH_OUTPUT_DIR" \
   "$LARGE_INPUT_DIR" \
   "$LARGE_OUTPUT_DIR" \
@@ -69,7 +69,7 @@ mkdir -p \
 mkdir -p "$PROJECT_ROOT/workspace"
 
 for workspace_name in \
-  research-inout \
+  research-input \
   research-output \
   large-input \
   large-output \
@@ -82,14 +82,14 @@ for workspace_name in \
   fi
 done
 
-replace_link "$RESEARCH_INOUT_DIR" "$PROJECT_ROOT/workspace/research-inout"
+replace_link "$RESEARCH_INPUT_DIR" "$PROJECT_ROOT/workspace/research-input"
 replace_link "$RESEARCH_OUTPUT_DIR" "$PROJECT_ROOT/workspace/research-output"
 replace_link "$LARGE_INPUT_DIR" "$PROJECT_ROOT/workspace/large-input"
 replace_link "$LARGE_OUTPUT_DIR" "$PROJECT_ROOT/workspace/large-output"
 replace_link "$SCRATCH_DIR" "$PROJECT_ROOT/workspace/scratch"
 
 echo "Workspace configured for $PROJECT_NAME ($WORKSPACE_NAME):"
-echo "  research-inout:  $RESEARCH_INOUT_DIR"
+echo "  research-input:  $RESEARCH_INPUT_DIR"
 echo "  research-output: $RESEARCH_OUTPUT_DIR"
 echo "  large-input:     $LARGE_INPUT_DIR"
 echo "  large-output:    $LARGE_OUTPUT_DIR"

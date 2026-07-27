@@ -25,7 +25,7 @@ TODO
 ## Shared files and output locations
 
 - Git branch / commit: TODO
-- `workspace/research-inout/`: TODO
+- `workspace/research-input/`: TODO
 - `workspace/research-output/`: TODO
 - `workspace/large-input/`: TODO
 - `workspace/large-output/`: TODO

@@ -6,7 +6,7 @@ Read `PROJECT.md` and `handoffs/CURRENT.md` before starting.
 
 - Operate from this repository root.
 - Access Dropbox only through these project links:
-  - `workspace/research-inout/`
+  - `workspace/research-input/`
   - `workspace/research-output/`
   - `workspace/large-input/`
   - `workspace/large-output/`
@@ -16,7 +16,7 @@ Read `PROJECT.md` and `handoffs/CURRENT.md` before starting.
 
 ## Storage rules
 
-- `workspace/research-inout/`: shared lightweight inputs, documents, metadata, and manually exchanged files; read/write.
+- `workspace/research-input/`: shared lightweight inputs, documents, metadata, and manually exchanged files; read/write.
 - `workspace/research-output/`: shared lightweight or normal-sized outputs; write outputs into a task-specific subdirectory when practical.
 - `workspace/large-input/`: shared large inputs; treat as read-only unless explicitly instructed otherwise.
 - `workspace/large-output/`: shared large outputs; write into a task-specific subdirectory when practical.

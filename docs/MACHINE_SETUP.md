@@ -14,7 +14,7 @@ ForShareLargeData
 scriptは次のAI専用rootを作成します。
 
 ```text
-Research/aicode/inout
+Research/aicode/input
 Research/aicode/output
 ForShareLargeData/aicode/input
 ForShareLargeData/aicode/output
@@ -46,7 +46,7 @@ hash -r
 Dropbox全体のrootはexportしません。projectから使用できる共有rootは次だけです。
 
 ```text
-AICODE_RESEARCH_INOUT_ROOT
+AICODE_RESEARCH_INPUT_ROOT
 AICODE_RESEARCH_OUTPUT_ROOT
 AICODE_LARGE_INPUT_ROOT
 AICODE_LARGE_OUTPUT_ROOT

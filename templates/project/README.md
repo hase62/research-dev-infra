@@ -12,7 +12,7 @@ research-doctor __PROJECT_NAME__
 `setup-workspace` creates five local links:
 
 ```text
-workspace/research-inout  -> Research/aicode/inout/__PROJECT_NAME__
+workspace/research-input  -> Research/aicode/input/__PROJECT_NAME__
 workspace/research-output -> Research/aicode/output/__PROJECT_NAME__
 workspace/large-input     -> ForShareLargeData/aicode/input/__PROJECT_NAME__
 workspace/large-output    -> ForShareLargeData/aicode/output/__PROJECT_NAME__

@@ -18,7 +18,7 @@ Migrate an existing WSL2 home setup without modifying project repositories
 under ~/src. Default behavior is --dry-run.
 
 The resulting shared roots are limited to:
-  Research/aicode/inout
+  Research/aicode/input
   Research/aicode/output
   ForShareLargeData/aicode/input
   ForShareLargeData/aicode/output
@@ -81,7 +81,7 @@ else
       "${DROPBOX_ROOT:-}" \
       "${RESEARCH_ROOT:+$(dirname "$RESEARCH_ROOT")}" \
       "${LARGE_ROOT:+$(dirname "$LARGE_ROOT")}" \
-      "${AICODE_RESEARCH_INOUT_ROOT:+$(dirname "$(dirname "$(dirname "$AICODE_RESEARCH_INOUT_ROOT")")")}"; do
+      "${AICODE_RESEARCH_INPUT_ROOT:+$(dirname "$(dirname "$(dirname "$AICODE_RESEARCH_INPUT_ROOT")")")}"; do
       add_candidate "$value"
     done
   fi
@@ -105,13 +105,13 @@ if [[ ${#VALID[@]} -ne 1 ]]; then
 fi
 
 DROPBOX_ROOT_NEW="${VALID[0]}"
-AICODE_RESEARCH_INOUT_ROOT_NEW="$DROPBOX_ROOT_NEW/Research/aicode/inout"
+AICODE_RESEARCH_INPUT_ROOT_NEW="$DROPBOX_ROOT_NEW/Research/aicode/input"
 AICODE_RESEARCH_OUTPUT_ROOT_NEW="$DROPBOX_ROOT_NEW/Research/aicode/output"
 AICODE_LARGE_INPUT_ROOT_NEW="$DROPBOX_ROOT_NEW/ForShareLargeData/aicode/input"
 AICODE_LARGE_OUTPUT_ROOT_NEW="$DROPBOX_ROOT_NEW/ForShareLargeData/aicode/output"
 
 printf 'Mode:                    %s\n' "$MODE"
-printf 'Research in/out root:    %s\n' "$AICODE_RESEARCH_INOUT_ROOT_NEW"
+printf 'Research input root:    %s\n' "$AICODE_RESEARCH_INPUT_ROOT_NEW"
 printf 'Research output root:    %s\n' "$AICODE_RESEARCH_OUTPUT_ROOT_NEW"
 printf 'Large input root:        %s\n' "$AICODE_LARGE_INPUT_ROOT_NEW"
 printf 'Large output root:       %s\n' "$AICODE_LARGE_OUTPUT_ROOT_NEW"
@@ -142,13 +142,13 @@ mkdir -p \
   "$HOME/worktrees" \
   "$HOME/scratch" \
   "$HOME/.local/bin" \
-  "$AICODE_RESEARCH_INOUT_ROOT_NEW" \
+  "$AICODE_RESEARCH_INPUT_ROOT_NEW" \
   "$AICODE_RESEARCH_OUTPUT_ROOT_NEW" \
   "$AICODE_LARGE_INPUT_ROOT_NEW" \
   "$AICODE_LARGE_OUTPUT_ROOT_NEW"
 
 python3 - "$HOME/.research_env" \
-  "$AICODE_RESEARCH_INOUT_ROOT_NEW" \
+  "$AICODE_RESEARCH_INPUT_ROOT_NEW" \
   "$AICODE_RESEARCH_OUTPUT_ROOT_NEW" \
   "$AICODE_LARGE_INPUT_ROOT_NEW" \
   "$AICODE_LARGE_OUTPUT_ROOT_NEW" \
@@ -158,7 +158,7 @@ from pathlib import Path
 
 path = Path(sys.argv[1])
 values = {
-    "AICODE_RESEARCH_INOUT_ROOT": sys.argv[2],
+    "AICODE_RESEARCH_INPUT_ROOT": sys.argv[2],
     "AICODE_RESEARCH_OUTPUT_ROOT": sys.argv[3],
     "AICODE_LARGE_INPUT_ROOT": sys.argv[4],
     "AICODE_LARGE_OUTPUT_ROOT": sys.argv[5],

@@ -25,7 +25,7 @@ verify-workspace-migration
 
 ```bash
 printf '%s\n' \
-  "$AICODE_RESEARCH_INOUT_ROOT" \
+  "$AICODE_RESEARCH_INPUT_ROOT" \
   "$AICODE_RESEARCH_OUTPUT_ROOT" \
   "$AICODE_LARGE_INPUT_ROOT" \
   "$AICODE_LARGE_OUTPUT_ROOT"

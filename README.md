@@ -17,7 +17,7 @@ WSL2またはmacOS上で、GitHub、Dropbox、VS Code、Emacs、Codex、Claude C
 - Dropbox上でAgentが扱う範囲は、projectごとの次の4 directoryに固定する。
 
 ```text
-Research/aicode/inout/<Project>
+Research/aicode/input/<Project>
 Research/aicode/output/<Project>
 ForShareLargeData/aicode/input/<Project>
 ForShareLargeData/aicode/output/<Project>
@@ -48,7 +48,7 @@ WSL2ではrepositoryをLinux filesystemの`~/src/`へ置き、Windows版VS Code�
 `~/.research_env`にはDropbox全体のrootをexportせず、次の4つのAI用rootだけを記録します。
 
 ```text
-AICODE_RESEARCH_INOUT_ROOT  = Research/aicode/inout
+AICODE_RESEARCH_INPUT_ROOT  = Research/aicode/input
 AICODE_RESEARCH_OUTPUT_ROOT = Research/aicode/output
 AICODE_LARGE_INPUT_ROOT     = ForShareLargeData/aicode/input
 AICODE_LARGE_OUTPUT_ROOT    = ForShareLargeData/aicode/output
@@ -72,7 +72,7 @@ AICODE_LARGE_OUTPUT_ROOT    = ForShareLargeData/aicode/output
 ├── handoffs/CURRENT.md
 ├── scripts/configure-workspace.sh
 └── workspace/                     # Git管理しないlink層
-    ├── research-inout  -> Research/aicode/inout/<Project>
+    ├── research-input  -> Research/aicode/input/<Project>
     ├── research-output -> Research/aicode/output/<Project>
     ├── large-input     -> ForShareLargeData/aicode/input/<Project>
     ├── large-output    -> ForShareLargeData/aicode/output/<Project>
@@ -214,7 +214,7 @@ cd research-dev-infra
 Dropbox root直下に`Research`と`ForShareLargeData`が存在する前提です。`setup-machine.sh`は、その中へ次を作成します。
 
 ```text
-Research/aicode/inout
+Research/aicode/input
 Research/aicode/output
 ForShareLargeData/aicode/input
 ForShareLargeData/aicode/output
@@ -257,13 +257,13 @@ bash scripts/setup-machine.sh \
 ```bash
 source ~/.research_env
 printf '%s\n' \
-  "$AICODE_RESEARCH_INOUT_ROOT" \
+  "$AICODE_RESEARCH_INPUT_ROOT" \
   "$AICODE_RESEARCH_OUTPUT_ROOT" \
   "$AICODE_LARGE_INPUT_ROOT" \
   "$AICODE_LARGE_OUTPUT_ROOT"
 
 ls -ld \
-  "$AICODE_RESEARCH_INOUT_ROOT" \
+  "$AICODE_RESEARCH_INPUT_ROOT" \
   "$AICODE_RESEARCH_OUTPUT_ROOT" \
   "$AICODE_LARGE_INPUT_ROOT" \
   "$AICODE_LARGE_OUTPUT_ROOT"
@@ -453,7 +453,7 @@ research-doctor Sepsis.Atlas
 project名が`Sepsis.Atlas`なら、次が自動的に作成・linkされます。
 
 ```text
-workspace/research-inout  -> Research/aicode/inout/Sepsis.Atlas
+workspace/research-input  -> Research/aicode/input/Sepsis.Atlas
 workspace/research-output -> Research/aicode/output/Sepsis.Atlas
 workspace/large-input     -> ForShareLargeData/aicode/input/Sepsis.Atlas
 workspace/large-output    -> ForShareLargeData/aicode/output/Sepsis.Atlas
@@ -479,7 +479,7 @@ research-doctor Sepsis.Atlas
 
 | Workspace path | 用途 |
 |---|---|
-| `workspace/research-inout/` | 文書、論文、metadata、manifest、小さめの入力、手動受け渡しなど。read/write |
+| `workspace/research-input/` | 文書、論文、metadata、manifest、小さめの入力、手動受け渡しなど。read/write |
 | `workspace/research-output/` | report、table、figure、通常サイズの中間・最終成果物 |
 | `workspace/large-input/` | 大容量入力。原則read-only |
 | `workspace/large-output/` | 大容量の中間・最終成果物 |
@@ -981,7 +981,7 @@ test → commit → push → PR/merge → main更新 → 各PCのworktree削除 
 Agentが利用するDropbox領域はprojectごとの次の4つだけです。
 
 ```text
-Research/aicode/inout/<Project>
+Research/aicode/input/<Project>
 Research/aicode/output/<Project>
 ForShareLargeData/aicode/input/<Project>
 ForShareLargeData/aicode/output/<Project>

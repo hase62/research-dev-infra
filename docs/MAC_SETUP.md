@@ -37,7 +37,7 @@ bash scripts/setup-machine.sh \
 共有対象は次の4 rootだけです。
 
 ```text
-Research/aicode/inout
+Research/aicode/input
 Research/aicode/output
 ForShareLargeData/aicode/input
 ForShareLargeData/aicode/output

@@ -102,7 +102,7 @@ else
 fi
 
 new_variables=(
-  AICODE_RESEARCH_INOUT_ROOT
+  AICODE_RESEARCH_INPUT_ROOT
   AICODE_RESEARCH_OUTPUT_ROOT
   AICODE_LARGE_INPUT_ROOT
   AICODE_LARGE_OUTPUT_ROOT
@@ -129,9 +129,9 @@ for legacy_variable in DROPBOX_ROOT RESEARCH_ROOT LARGE_ROOT LOCAL_ROOT LOCAL_LA
   fi
 done
 
-[[ "${AICODE_RESEARCH_INOUT_ROOT:-}" == */Research/aicode/inout ]] \
-  && ok "Research in/out root has the fixed path" \
-  || fail_check "Research in/out root should end with Research/aicode/inout"
+[[ "${AICODE_RESEARCH_INPUT_ROOT:-}" == */Research/aicode/input ]] \
+  && ok "Research input root has the fixed path" \
+  || fail_check "Research input root should end with Research/aicode/input"
 [[ "${AICODE_RESEARCH_OUTPUT_ROOT:-}" == */Research/aicode/output ]] \
   && ok "Research output root has the fixed path" \
   || fail_check "Research output root should end with Research/aicode/output"
@@ -151,12 +151,12 @@ fi
 section "Template policy"
 template_config="$INFRA_ROOT/templates/project/scripts/configure-workspace.sh"
 for required_text in \
-  'workspace/research-inout' \
+  'workspace/research-input' \
   'workspace/research-output' \
   'workspace/large-input' \
   'workspace/large-output' \
   'workspace/scratch' \
-  'AICODE_RESEARCH_INOUT_ROOT' \
+  'AICODE_RESEARCH_INPUT_ROOT' \
   'AICODE_RESEARCH_OUTPUT_ROOT' \
   'AICODE_LARGE_INPUT_ROOT' \
   'AICODE_LARGE_OUTPUT_ROOT'; do
@@ -206,7 +206,7 @@ for path in root.rglob('*'):
         path.write_text(text.replace('__PROJECT_NAME__', 'MigrationCheck'))
 PY
   cat > "$test_home/.research_env" <<EOF
-export AICODE_RESEARCH_INOUT_ROOT='$test_dropbox/Research/aicode/inout'
+export AICODE_RESEARCH_INPUT_ROOT='$test_dropbox/Research/aicode/input'
 export AICODE_RESEARCH_OUTPUT_ROOT='$test_dropbox/Research/aicode/output'
 export AICODE_LARGE_INPUT_ROOT='$test_dropbox/ForShareLargeData/aicode/input'
 export AICODE_LARGE_OUTPUT_ROOT='$test_dropbox/ForShareLargeData/aicode/output'
@@ -224,13 +224,13 @@ EOF
   fi
 
   declare -A expected=(
-    [research-inout]="$test_dropbox/Research/aicode/inout/MigrationCheck"
+    [research-input]="$test_dropbox/Research/aicode/input/MigrationCheck"
     [research-output]="$test_dropbox/Research/aicode/output/MigrationCheck"
     [large-input]="$test_dropbox/ForShareLargeData/aicode/input/MigrationCheck"
     [large-output]="$test_dropbox/ForShareLargeData/aicode/output/MigrationCheck"
     [scratch]="$test_scratch/MigrationCheck/test-task"
   )
-  for name in research-inout research-output large-input large-output scratch; do
+  for name in research-input research-output large-input large-output scratch; do
     link="$test_project/workspace/$name"
     if [[ -L "$link" && -e "$link" ]]; then
       actual="$(canonical_path "$link")"
@@ -254,12 +254,12 @@ if [[ -n "$PROJECT_ROOT" ]]; then
   else
     project_name="$(basename "$(git -C "$PROJECT_ROOT" rev-parse --show-toplevel 2>/dev/null || printf '%s' "$PROJECT_ROOT")")"
     declare -A roots=(
-      [research-inout]="${AICODE_RESEARCH_INOUT_ROOT:-}/$project_name"
+      [research-input]="${AICODE_RESEARCH_INPUT_ROOT:-}/$project_name"
       [research-output]="${AICODE_RESEARCH_OUTPUT_ROOT:-}/$project_name"
       [large-input]="${AICODE_LARGE_INPUT_ROOT:-}/$project_name"
       [large-output]="${AICODE_LARGE_OUTPUT_ROOT:-}/$project_name"
     )
-    for name in research-inout research-output large-input large-output scratch; do
+    for name in research-input research-output large-input large-output scratch; do
       link="$PROJECT_ROOT/workspace/$name"
       if [[ -L "$link" && -e "$link" ]]; then
         ok "project link: workspace/$name -> $(readlink "$link")"

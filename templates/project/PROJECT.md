@@ -19,7 +19,7 @@ TODO: 現在の作業段階を記載する。
 
 | Workspace path | Dropbox target | Intended use |
 |---|---|---|
-| `workspace/research-inout/` | `Research/aicode/inout/__PROJECT_NAME__` | Lightweight inputs, documents, metadata, and shared staging |
+| `workspace/research-input/` | `Research/aicode/input/__PROJECT_NAME__` | Lightweight inputs, documents, metadata, and shared staging |
 | `workspace/research-output/` | `Research/aicode/output/__PROJECT_NAME__` | Lightweight or normal-sized shared outputs |
 | `workspace/large-input/` | `ForShareLargeData/aicode/input/__PROJECT_NAME__` | Large shared inputs; read-only by default |
 | `workspace/large-output/` | `ForShareLargeData/aicode/output/__PROJECT_NAME__` | Large shared outputs |

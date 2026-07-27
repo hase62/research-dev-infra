@@ -504,7 +504,7 @@ find workspace -maxdepth 1 -type l -print -exec readlink {} \;
 正常なlink名は次の5つだけです。
 
 ```text
-research-inout
+research-input
 research-output
 large-input
 large-output

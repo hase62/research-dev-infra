@@ -37,7 +37,7 @@ printf 'Project: %s\nPath:    %s\n\n' "$PROJECT" "$REPO"
 [[ -d "$REPO" ]] && ok "project directory exists" || fail_check "project directory not found"
 [[ -d "$REPO/.git" || -f "$REPO/.git" ]] && ok "Git working tree" || fail_check "not a Git working tree"
 
-workspace_names=(research-inout research-output large-input large-output scratch)
+workspace_names=(research-input research-output large-input large-output scratch)
 for workspace_name in "${workspace_names[@]}"; do
   workspace_path="$REPO/workspace/$workspace_name"
   if [[ -L "$workspace_path" && -e "$workspace_path" ]]; then
