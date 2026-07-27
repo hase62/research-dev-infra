@@ -151,7 +151,7 @@ if command -v gh >/dev/null 2>&1; then
   fi
 fi
 
-for variable_name in DROPBOX_ROOT RESEARCH_ROOT LARGE_ROOT SRC_ROOT WORKTREE_ROOT SCRATCH_ROOT; do
+for variable_name in AICODE_RESEARCH_INOUT_ROOT AICODE_RESEARCH_OUTPUT_ROOT AICODE_LARGE_INPUT_ROOT AICODE_LARGE_OUTPUT_ROOT SRC_ROOT WORKTREE_ROOT SCRATCH_ROOT; do
   value="${!variable_name:-}"
   if [[ -n "$value" && -e "$value" ]]; then
     ok "$variable_name -> $value"
@@ -161,6 +161,17 @@ for variable_name in DROPBOX_ROOT RESEARCH_ROOT LARGE_ROOT SRC_ROOT WORKTREE_ROO
     fail_check "$variable_name is not set"
   fi
 done
+
+for legacy_variable in DROPBOX_ROOT RESEARCH_ROOT LARGE_ROOT; do
+  if [[ -n "${!legacy_variable:-}" ]]; then
+    warn "$legacy_variable is still set in the current shell; open a new shell or rerun setup-machine"
+  fi
+done
+
+[[ "${AICODE_RESEARCH_INOUT_ROOT:-}" == */Research/aicode/inout ]] || fail_check "AICODE_RESEARCH_INOUT_ROOT has an unexpected path"
+[[ "${AICODE_RESEARCH_OUTPUT_ROOT:-}" == */Research/aicode/output ]] || fail_check "AICODE_RESEARCH_OUTPUT_ROOT has an unexpected path"
+[[ "${AICODE_LARGE_INPUT_ROOT:-}" == */ForShareLargeData/aicode/input ]] || fail_check "AICODE_LARGE_INPUT_ROOT has an unexpected path"
+[[ "${AICODE_LARGE_OUTPUT_ROOT:-}" == */ForShareLargeData/aicode/output ]] || fail_check "AICODE_LARGE_OUTPUT_ROOT has an unexpected path"
 
 if [[ -e "$HOME/data-roots" || -L "$HOME/data-roots" ]]; then
   warn "Legacy ~/data-roots remains; rerun setup-machine and inspect any preserved non-symlink contents"

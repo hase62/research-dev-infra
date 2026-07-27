@@ -10,24 +10,33 @@ TODO: 現在の作業段階を記載する。
 
 ## Repository and storage scope
 
-- Code, tests, lightweight configuration, Agent instructions, handoff notes, and small metadata are stored in Git.
-- Shared data, papers, large intermediate outputs, and final outputs are stored in Dropbox or another explicitly documented shared store.
-- `workspace/` is a machine-local link layer, not the authoritative storage location.
-- Shared input data are exposed only through `workspace/data/`.
-- Temporary and reproducible files must be written under `workspace/scratch/`.
-- Working outputs must be written under `workspace/output/`; outputs needed on another computer must resolve to shared storage or be promoted there before handoff.
+- Code, tests, configuration, Agent instructions, handoff notes, manifests, and small metadata are stored in Git.
+- Dropbox access is limited to four fixed project directories exposed under `workspace/`.
+- `workspace/` is a local link layer; the authoritative shared files remain in Dropbox.
+- Local temporary files are placed only under `workspace/scratch/`.
+
+## Fixed workspace paths
+
+| Workspace path | Dropbox target | Intended use |
+|---|---|---|
+| `workspace/research-inout/` | `Research/aicode/inout/__PROJECT_NAME__` | Lightweight inputs, documents, metadata, and shared staging |
+| `workspace/research-output/` | `Research/aicode/output/__PROJECT_NAME__` | Lightweight or normal-sized shared outputs |
+| `workspace/large-input/` | `ForShareLargeData/aicode/input/__PROJECT_NAME__` | Large shared inputs; read-only by default |
+| `workspace/large-output/` | `ForShareLargeData/aicode/output/__PROJECT_NAME__` | Large shared outputs |
+| `workspace/scratch/` | Local `~/scratch/...` | Disposable and reproducible temporary files |
+
+Subdirectories may be created within these project directories. Prefer task- or run-specific output subdirectories to avoid collisions between worktrees and computers.
 
 ## Mandatory rules
 
-- Work only inside this repository, except for paths explicitly exposed through `workspace/`.
-- Do not search parent directories or unrelated projects.
-- Do not access Dropbox roots directly.
-- Treat everything under `workspace/data/` as read-only unless explicitly instructed otherwise.
-- Do not read `.env`, credentials, tokens, or secret files.
-- Do not commit, push, merge, rebase, or delete data unless explicitly requested.
-- Do not leave the only copy of a persistent file on one computer.
-- Commit shareable text/code to Git and place large persistent artifacts in the documented shared storage.
-- Treat `workspace/scratch/` and any local-only `workspace/output/` as disposable and reproducible.
+- Work only inside this repository and the five paths listed above.
+- Do not access or search Dropbox roots directly.
+- Do not search parent directories, sibling repositories, or unrelated projects.
+- Do not recursively inventory every linked directory unless explicitly requested.
+- Treat `workspace/large-input/` as read-only unless explicitly instructed otherwise.
+- Do not read credentials, tokens, secrets, or unrelated `.env` files.
+- Do not commit, push, merge, rebase, or delete shared data unless explicitly requested.
+- Do not leave the only copy of a persistent artifact in `workspace/scratch/`.
 - Inspect `git status` and `git diff` before completing a task.
-- Codex and Claude Code may continue the same task sequentially in the same worktree, but must not edit that worktree at the same time.
-- When handing work to the other agent, read and update `handoffs/CURRENT.md`; Git files and diffs are the source of truth, not chat history.
+- Codex and Claude Code may continue the same task sequentially in one worktree, but must not edit it at the same time.
+- When handing off, update `handoffs/CURRENT.md`; Git files and shared paths are the source of truth, not chat history.

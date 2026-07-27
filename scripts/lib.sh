@@ -71,8 +71,10 @@ load_research_env() {
   : "${SRC_ROOT:?SRC_ROOT is not set}"
   : "${WORKTREE_ROOT:?WORKTREE_ROOT is not set}"
   : "${SCRATCH_ROOT:?SCRATCH_ROOT is not set}"
-  : "${RESEARCH_ROOT:?RESEARCH_ROOT is not set}"
-  : "${LARGE_ROOT:?LARGE_ROOT is not set}"
+  : "${AICODE_RESEARCH_INOUT_ROOT:?AICODE_RESEARCH_INOUT_ROOT is not set}"
+  : "${AICODE_RESEARCH_OUTPUT_ROOT:?AICODE_RESEARCH_OUTPUT_ROOT is not set}"
+  : "${AICODE_LARGE_INPUT_ROOT:?AICODE_LARGE_INPUT_ROOT is not set}"
+  : "${AICODE_LARGE_OUTPUT_ROOT:?AICODE_LARGE_OUTPUT_ROOT is not set}"
 }
 
 validate_name() {

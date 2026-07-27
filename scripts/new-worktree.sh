@@ -118,7 +118,7 @@ else
   ACTION="created from $BASE"
 fi
 
-mkdir -p "$TARGET/workspace/data"
+mkdir -p "$TARGET/workspace"
 
 if [[ -x "$TARGET/scripts/configure-workspace.sh" ]]; then
   PROJECT_ROOT="$TARGET" WORKSPACE_NAME="$WORKSPACE" bash "$TARGET/scripts/configure-workspace.sh"

@@ -71,7 +71,7 @@ cp -a "$INFRA_ROOT/templates/project/." "$PROJECT_DIR/"
 replace_placeholder "$PROJECT_DIR" "__PROJECT_NAME__" "$PROJECT"
 mkdir -p "$PROJECT_DIR/analysis" "$PROJECT_DIR/docs" "$PROJECT_DIR/handoffs" "$PROJECT_DIR/tasks" "$PROJECT_DIR/tests"
 touch "$PROJECT_DIR/analysis/.gitkeep" "$PROJECT_DIR/docs/.gitkeep" "$PROJECT_DIR/tasks/.gitkeep" "$PROJECT_DIR/tests/.gitkeep"
-mkdir -p "$PROJECT_DIR/workspace/data"
+mkdir -p "$PROJECT_DIR/workspace"
 chmod +x "$PROJECT_DIR/scripts/configure-workspace.sh"
 
 PROJECT_ROOT="$PROJECT_DIR" WORKSPACE_NAME="main" bash "$PROJECT_DIR/scripts/configure-workspace.sh"
@@ -105,7 +105,6 @@ echo
 echo "Next steps:"
 echo "  cd '$PROJECT_DIR'"
 echo "  edit PROJECT.md"
-echo "  edit scripts/configure-workspace.sh"
 echo "  setup-workspace"
 echo "  code ."
 if [[ "$CREATE_GITHUB" != true ]]; then

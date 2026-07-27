@@ -6,7 +6,7 @@ usage() {
 Usage:
   setup-workspace [PROJECT_PATH]
 
-Reconstruct workspace/data, workspace/scratch, and workspace/output from the
+Reconstruct the four fixed Dropbox links and local workspace/scratch from the
 tracked scripts/configure-workspace.sh in a project or worktree.
 
 Without PROJECT_PATH, the current Git working tree root is used. If the current

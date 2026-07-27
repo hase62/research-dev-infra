@@ -9,7 +9,17 @@ setup-workspace
 research-doctor __PROJECT_NAME__
 ```
 
-Shared data and outputs are exposed under `workspace/`; the links themselves are not tracked by Git. `workspace/` is not a private storage area. Persistent text/code belongs in GitHub, and large persistent artifacts belong in Dropbox or the documented shared store. Read `PROJECT.md` before starting Codex or Claude Code.
+`setup-workspace` creates five local links:
+
+```text
+workspace/research-inout  -> Research/aicode/inout/__PROJECT_NAME__
+workspace/research-output -> Research/aicode/output/__PROJECT_NAME__
+workspace/large-input     -> ForShareLargeData/aicode/input/__PROJECT_NAME__
+workspace/large-output    -> ForShareLargeData/aicode/output/__PROJECT_NAME__
+workspace/scratch         -> local ~/scratch/... directory
+```
+
+Agents must not search outside these paths. Required files should be copied into the appropriate project directory in advance or created inside it.
 
 ## Open in Visual Studio Code
 
@@ -18,11 +28,9 @@ cd ~/src/__PROJECT_NAME__
 code .
 ```
 
-On WSL2, confirm that the lower-left corner shows a WSL connection. On macOS, open the local repository directly. Use the Codex or Claude Code VS Code extension as the primary interface. Use the integrated terminal for Git, environments, tests, or the optional CLI interfaces.
+Use the Codex or Claude Code VS Code extension as the primary interface. The project settings exclude linked data and output trees from automatic VS Code search and file watching; files can still be opened directly.
 
 ## Long task worktree
-
-Use one unique task name for one logical task.
 
 ```bash
 new-worktree __PROJECT_NAME__ shared metadata-audit
@@ -30,15 +38,11 @@ cd ~/worktrees/__PROJECT_NAME__/shared-metadata-audit
 code .
 ```
 
-Continue using the same task name until that task is merged. Do not reuse the worktree for an unrelated task. After merge, delete the local worktree and task branch, then create a new worktree with a new task name.
+Use one unique task name per logical task. Continue using that name until merge, then delete the worktree and branch. `shared` means Codex and Claude Code may use the same worktree sequentially, not simultaneously.
 
-`shared` means Codex and Claude Code may use the same worktree sequentially. Do not give both Agents editing tasks at the same time.
+## Continue on another computer
 
-## Continue the task on another computer
-
-The worktree folder is local to each computer. Continue through the pushed Git branch.
-
-On the computer you are leaving:
+Before leaving the current computer:
 
 ```bash
 git add <reviewed-files>
@@ -54,13 +58,4 @@ git fetch --all --prune
 new-worktree __PROJECT_NAME__ shared metadata-audit
 ```
 
-`new-worktree` resumes `origin/work/metadata-audit` and recreates local `workspace` links. GitHub carries code, instructions, and handoff notes; Dropbox carries shared data and large persistent outputs. Uncommitted changes, local environments, reproducible scratch outputs, and Agent chat sessions do not move between computers. Record the current state and shared output paths in `handoffs/CURRENT.md`.
-
-## Edit with Emacs
-
-```bash
-cd ~/src/__PROJECT_NAME__
-e PROJECT.md
-```
-
-VS Code and Emacs may both be open, but do not edit the same file in both at the same time.
+GitHub carries code and instructions. Dropbox carries the four shared project directories. Uncommitted changes, environments, local scratch, and Agent chat sessions do not move between computers.

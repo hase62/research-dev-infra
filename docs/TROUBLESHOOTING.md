@@ -489,3 +489,30 @@ environment-macos.yml
 ```
 
 GPU/CUDA依存環境はMacへ再現せず、HPCまたはGPU端末へ残します。
+
+---
+
+## workspace linkがない／古いpathを指す
+
+projectまたはworktree rootで再構築します。
+
+```bash
+setup-workspace
+find workspace -maxdepth 1 -type l -print -exec readlink {} \;
+```
+
+正常なlink名は次の5つだけです。
+
+```text
+research-inout
+research-output
+large-input
+large-output
+scratch
+```
+
+旧式の可変data/output linkや任意のDropbox subpath linkが残っている場合は、新しいproject templateへ移行できていません。
+
+## AgentがDropbox全体を探索しようとする
+
+Agentはproject rootまたはworktree rootから起動し、`PROJECT.md`、`AGENTS.md`または`CLAUDE.md`を読ませます。使用可能なDropbox pathは4つの固定workspace linkだけです。必要なdataを該当project directoryへ先にコピーし、Dropbox rootや他projectを探索させません。

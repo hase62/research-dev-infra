@@ -1,56 +1,34 @@
 # Existing WSL2 home migration
 
-Use this once after updating `research-dev-infra` to the visible `workspace/`
-and direct-Dropbox-root layout.
+既存WSL2の`~/src`以外を、4つの固定Dropbox root方式へ移行します。
 
-The migration does not modify project repositories or files under `~/src`.
-It updates only the WSL2 home-level configuration:
-
-- `~/.research_env`
-- `~/.bashrc`
-- `~/worktrees`
-- `~/scratch`
-- `~/.local/bin`
-- the legacy `~/data-roots` symlink directory
-
-## 1. Preview
+## dry-run
 
 ```bash
-cd ~/src/research-dev-infra
-
 bash scripts/migrate-existing-wsl-home.sh \
   --dropbox-root "/mnt/c/Users/<WindowsUser>/Dropbox"
 ```
 
-The default is dry-run. Review the proposed diffs and cleanup list.
-
-## 2. Apply
+## apply
 
 ```bash
 bash scripts/migrate-existing-wsl-home.sh \
   --apply \
   --dropbox-root "/mnt/c/Users/<WindowsUser>/Dropbox"
-```
 
-The script creates timestamped backups of `~/.research_env` and `~/.bashrc`
-when those files already exist.
-
-## 3. Reload and verify
-
-```bash
 source ~/.bashrc
 hash -r
-
-printf 'DROPBOX_ROOT=%s\n' "$DROPBOX_ROOT"
-printf 'RESEARCH_ROOT=%s\n' "$RESEARCH_ROOT"
-printf 'LARGE_ROOT=%s\n' "$LARGE_ROOT"
-
-command -v setup-workspace
-
-test ! -e "$HOME/data-roots" && \
-  echo "legacy ~/data-roots removed"
+verify-workspace-migration
 ```
 
-If `~/data-roots` contains a real file, a real directory, or an unknown
-symlink, the script leaves it untouched and prints a warning. Inspect those
-entries manually; do not delete them blindly.
+移行後の確認：
+
+```bash
+printf '%s\n' \
+  "$AICODE_RESEARCH_INOUT_ROOT" \
+  "$AICODE_RESEARCH_OUTPUT_ROOT" \
+  "$AICODE_LARGE_INPUT_ROOT" \
+  "$AICODE_LARGE_OUTPUT_ROOT"
+```
+
+scriptは`~/src`以下を変更しません。旧`~/data-roots`では既知のsymlinkだけを削除し、予期しない実fileやdirectoryは保持します。

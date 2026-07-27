@@ -11,21 +11,25 @@ WSL2またはmacOS上で、GitHub、Dropbox、VS Code、Emacs、Codex、Claude C
 ## 1. 基本方針
 
 - 研究projectごとにGitHub repositoryを分ける。
-- Git working treeはDropbox外の `~/src/` に置く。
-- **永続化すべき情報の唯一のコピーを、特定PCだけに置かない。**
-- code、設定、手順、Agent指示、handoff、小さなmetadataはGitHubで共有する。
-- data、論文、大きな中間成果物・最終成果物はDropboxで共有する。
-- Dropboxの既存構造は変更せず、必要なsubpathだけ各projectの `workspace/` にsymlinkする。
-- `workspace/`は保存先ではなく、共有storageとlocal scratchをproject内から参照するlink層とする。
-- PC固有に残してよいものは、credential、環境本体、cache、temporary file、再生成可能なscratchに限定する。
-- CodexとClaude Codeはproject repositoryまたは専用worktreeの中から起動する。
-- 同じworking treeをCodexとClaude Codeに同時編集させない。
-- 端末固有の設定は `~/.research_env` とprojectの `workspace/` に閉じ込める。
+- Git working treeはDropbox外の`~/src/`に置く。
+- 永続化すべき情報の唯一のコピーを、特定PCだけに置かない。
+- code、設定、手順、Agent指示、handoff、manifest、小さなmetadataはGitHubで共有する。
+- Dropbox上でAgentが扱う範囲は、projectごとの次の4 directoryに固定する。
+
+```text
+Research/aicode/inout/<Project>
+Research/aicode/output/<Project>
+ForShareLargeData/aicode/input/<Project>
+ForShareLargeData/aicode/output/<Project>
+```
+
+- 必要なdataや文書はこの4領域へコピーし、その内部で自由にsubdirectoryを作る。
+- AgentはDropbox rootや他projectを探索せず、projectの`workspace/`に作られた固定linkだけを使う。
+- `workspace/scratch/`だけはlocalの再生成可能な一時領域とする。
+- CodexとClaude Codeはproject repositoryまたは専用worktreeの中から起動し、同じworking treeを同時編集させない。
 - 解析環境はprojectごとに再構築可能な形で管理する。
 
-WSL2ではrepositoryをLinux filesystemの `~/src/` に置き、Windows版VS CodeからWSL extension経由で開きます。macOSでは `~/src/` に直接cloneし、Mac版VS CodeまたはEmacsで開きます。
-
----
+WSL2ではrepositoryをLinux filesystemの`~/src/`へ置き、Windows版VS CodeからWSL extension経由で開きます。macOSでは`~/src/`へ直接cloneします。
 
 ## 2. 作成される構成
 
@@ -38,10 +42,17 @@ WSL2ではrepositoryをLinux filesystemの `~/src/` に置き、Windows版VS Cod
 ├── worktrees/
 │   └── <Project>/<worktree-name>/
 └── scratch/
-    └── <Project>/<checkout-name>/{scratch,output}
+    └── <Project>/<checkout-name>/
 ```
 
-Dropboxはこのtreeの下へ複製・中継しません。`~/.research_env`の`RESEARCH_ROOT`と`LARGE_ROOT`が、WSL2ではWindows側Dropbox、macOSではFile Provider上のDropbox実体を直接指します。したがって`~/data-roots/`は不要です。
+`~/.research_env`にはDropbox全体のrootをexportせず、次の4つのAI用rootだけを記録します。
+
+```text
+AICODE_RESEARCH_INOUT_ROOT  = Research/aicode/inout
+AICODE_RESEARCH_OUTPUT_ROOT = Research/aicode/output
+AICODE_LARGE_INPUT_ROOT     = ForShareLargeData/aicode/input
+AICODE_LARGE_OUTPUT_ROOT    = ForShareLargeData/aicode/output
+```
 
 各projectの最小構成：
 
@@ -51,22 +62,24 @@ Dropboxはこのtreeの下へ複製・中継しません。`~/.research_env`の`
 ├── AGENTS.md
 ├── CLAUDE.md
 ├── README.md
-├── .vscode/extensions.json
+├── .vscode/
+│   ├── extensions.json
+│   └── settings.json
 ├── analysis/
 ├── docs/
 ├── tasks/
 ├── tests/
 ├── handoffs/CURRENT.md
 ├── scripts/configure-workspace.sh
-└── workspace/                 # Git管理しない
-    ├── data/
-    ├── scratch/
-    └── output/
+└── workspace/                     # Git管理しないlink層
+    ├── research-inout  -> Research/aicode/inout/<Project>
+    ├── research-output -> Research/aicode/output/<Project>
+    ├── large-input     -> ForShareLargeData/aicode/input/<Project>
+    ├── large-output    -> ForShareLargeData/aicode/output/<Project>
+    └── scratch         -> local ~/scratch/...
 ```
 
-`workspace/scratch`は常にlocalの一時領域です。`workspace/output`は未設定時には `~/scratch/<Project>/<checkout-name>/output` を指しますが、これは**再生成可能なworking output用の暫定先**です。別PCで必要になる成果物、再生成コストが高い成果物、最終成果物は、`scripts/configure-workspace.sh`でDropbox上の共有directoryを`workspace/output`へ割り当てます。
-
----
+4つのDropbox project directoryは`setup-workspace`が必要に応じて作成します。worktreeを複数使う場合は、output側でtask名やrun名のsubdirectoryを作り、衝突を避けます。
 
 # 3. 新しい端末のセットアップ
 
@@ -198,16 +211,16 @@ cd research-dev-infra
 
 ## 3.4 Dropboxと共通commandを設定する
 
-Dropboxには次のdirectoryが既に存在する前提です。
+Dropbox root直下に`Research`と`ForShareLargeData`が存在する前提です。`setup-machine.sh`は、その中へ次を作成します。
 
 ```text
-Research
-ForShareLargeData
+Research/aicode/inout
+Research/aicode/output
+ForShareLargeData/aicode/input
+ForShareLargeData/aicode/output
 ```
 
 ### WSL2
-
-通常はWindows userとDropbox pathを自動検出できます。
 
 ```bash
 cd ~/src/research-dev-infra
@@ -225,12 +238,6 @@ bash scripts/setup-machine.sh \
 
 ### macOS
 
-Dropbox File Provider環境では、通常は次の配下から自動検出します。
-
-```text
-~/Library/CloudStorage/Dropbox*
-```
-
 ```bash
 cd ~/src/research-dev-infra
 bash scripts/setup-machine.sh
@@ -238,17 +245,7 @@ source ~/.zshrc
 hash -r
 ```
 
-自動検出できない場合は候補を確認します。
-
-```bash
-find "$HOME/Library/CloudStorage" \
-  -maxdepth 1 \
-  -type d \
-  -name 'Dropbox*' \
-  -print
-```
-
-実際のrootを指定します。
+自動検出できない場合：
 
 ```bash
 bash scripts/setup-machine.sh \
@@ -259,35 +256,24 @@ bash scripts/setup-machine.sh \
 
 ```bash
 source ~/.research_env
-printf 'RESEARCH_ROOT=%s\n' "$RESEARCH_ROOT"
-printf 'LARGE_ROOT=%s\n' "$LARGE_ROOT"
-ls -ld "$RESEARCH_ROOT" "$LARGE_ROOT"
+printf '%s\n' \
+  "$AICODE_RESEARCH_INOUT_ROOT" \
+  "$AICODE_RESEARCH_OUTPUT_ROOT" \
+  "$AICODE_LARGE_INPUT_ROOT" \
+  "$AICODE_LARGE_OUTPUT_ROOT"
+
+ls -ld \
+  "$AICODE_RESEARCH_INOUT_ROOT" \
+  "$AICODE_RESEARCH_OUTPUT_ROOT" \
+  "$AICODE_LARGE_INPUT_ROOT" \
+  "$AICODE_LARGE_OUTPUT_ROOT"
+
 command -v setup-workspace
 command -v research-doctor
+command -v verify-workspace-migration
 ```
 
-`RESEARCH_ROOT`と`LARGE_ROOT`はDropbox実体を直接指します。旧版で作成された`~/data-roots/`内の既知symlinkは、`setup-machine.sh`再実行時に安全に削除されます。予期しない実fileがある場合は削除せずwarningを出します。
-
-`setup-machine.sh`は次を作成します。
-
-```text
-~/.research_env
-~/.local/bin/new-project
-~/.local/bin/new-worktree
-~/.local/bin/remove-worktree
-~/.local/bin/setup-workspace
-~/.local/bin/research-doctor
-~/.local/bin/install-coding-agents
-~/.local/bin/install-miniforge
-~/.local/bin/setup-vscode
-~/.local/bin/setup-agent-defaults
-~/.local/bin/setup-emacs
-~/.local/bin/analysis-smoke-test
-```
-
-infraに新しいcommandが追加された場合は、pull後に `bash scripts/setup-machine.sh` を再実行します。
-
----
+旧版の`DROPBOX_ROOT`、`RESEARCH_ROOT`、`LARGE_ROOT`はprojectへ公開しません。旧`~/data-roots/`の既知symlinkは安全に削除されます。
 
 ## 3.5 VS Code、Miniforge、Agent、Emacsを導入する
 
@@ -437,6 +423,20 @@ research-doctor
 
 `Failures: 0`なら基盤として使用できます。VS Code、R、Emacsなど未使用の任意toolはwarningでも構いません。
 
+旧project内の`.local/`廃止、`workspace/`導入、`~/data-roots`廃止、Dropbox実体pathへの直接参照が正しく反映されたかは、専用のread-only検証を実行します。
+
+```bash
+verify-workspace-migration
+```
+
+この検証はinfra、`~/.research_env`、`~/.bashrc`、共通command、project templateを確認し、temporary directory内で`workspace/`の再構築も試験します。既存projectは変更しません。すでに新方式へ移行した特定projectも確認する場合だけ、pathを追加します。
+
+```bash
+verify-workspace-migration --project ~/src/<Project>
+```
+
+既存のSepsis.Atlasなど、まだ個別移行していないprojectには`--project`を付けません。
+
 ---
 
 # 4. Projectを開始または再開する
@@ -446,29 +446,23 @@ research-doctor
 ```bash
 new-project Sepsis.Atlas --github
 cd ~/src/Sepsis.Atlas
-```
-
-次を編集します。
-
-```text
-PROJECT.md
-scripts/configure-workspace.sh
-```
-
-その後：
-
-```bash
 setup-workspace
 research-doctor Sepsis.Atlas
 ```
 
-GitHub repositoryを後から接続する場合は、`--github`を付けずに作成します。
+project名が`Sepsis.Atlas`なら、次が自動的に作成・linkされます。
 
----
+```text
+workspace/research-inout  -> Research/aicode/inout/Sepsis.Atlas
+workspace/research-output -> Research/aicode/output/Sepsis.Atlas
+workspace/large-input     -> ForShareLargeData/aicode/input/Sepsis.Atlas
+workspace/large-output    -> ForShareLargeData/aicode/output/Sepsis.Atlas
+workspace/scratch         -> local scratch
+```
+
+必要なdataや資料を該当project directoryへコピーし、その中で用途別のsubdirectoryを作成します。projectごとに任意のDropbox pathを設定する作業はありません。
 
 ## 4.2 既存projectをこの端末で再開する
-
-既存repositoryをcloneし、端末固有部分だけ再構築します。すでにclone済みなら、cloneの代わりに`git pull --rebase`を実行します。
 
 ```bash
 cd ~/src
@@ -479,77 +473,32 @@ setup-workspace
 research-doctor Sepsis.Atlas
 ```
 
-project環境を再作成します。
+別端末でもproject名から同じ4つのDropbox directoryへ接続されます。credential、環境本体、`workspace/`のsymlink、local scratch、実行中process、Agent chat sessionは同期されません。
 
-```bash
-mamba env create -f environment.yml
-conda activate sepsis-atlas
-analysis-smoke-test Sepsis.Atlas
-```
+# 5. Dropbox project領域の使い分け
 
-追加端末で作り直すもの：
+| Workspace path | 用途 |
+|---|---|
+| `workspace/research-inout/` | 文書、論文、metadata、manifest、小さめの入力、手動受け渡しなど。read/write |
+| `workspace/research-output/` | report、table、figure、通常サイズの中間・最終成果物 |
+| `workspace/large-input/` | 大容量入力。原則read-only |
+| `workspace/large-output/` | 大容量の中間・最終成果物 |
+| `workspace/scratch/` | localで再生成可能なtemporary file |
 
-- Codex／Claude Codeのログイン
-- Miniforge環境
-- Dropbox実体pathを記録した`~/.research_env`
-- projectの `workspace/`
+Agentにはこの5 path以外を探索させません。4つの共有directory全体を無目的に再帰探索させず、taskで指定したsubdirectoryまたはfileから開始させます。
 
-GitHubまたはDropboxで同期しないもの：
+複数worktreeや複数PCから同じprojectを使う場合は、出力先にtask名やrun名を付けます。
 
-- credential、token、secret
-- conda/mamba環境本体
-- `workspace/`のsymlinkそのもの
-- cache、temporary file、再生成可能なlocal scratch
-- 実行中processとAgent chat session
-
-`workspace/`のlink先となるdataや永続outputは、原則としてDropbox上にあります。特定PCにだけ必要な絶対pathを使うのは例外です。
-
----
-
-# 5. データlinkを設定する
-
-projectの `scripts/configure-workspace.sh` に、必要な共有dataとoutputだけ記述します。このscript自体はGitHubへcommitし、どのPCでも同じ論理pathを再構築できるようにします。
-
-通常の共有設定：
-
-```bash
-link_data "$RESEARCH_ROOT/Sepsis/metadata" metadata
-link_data "$LARGE_ROOT/Sepsis/processed" processed
-
-# 別PCでも必要な中間・最終成果物はDropboxへ置く
-use_output_dir "$LARGE_ROOT/Sepsis/results/$WORKSPACE_NAME"
-```
-
-`workspace/scratch`はlocal一時領域、`workspace/output`は上記の共有成果物directoryへの入口になります。`use_output_dir`を指定しない場合、`workspace/output`はlocal scratch配下を指すため、そこにあるものは再生成可能であることを前提とします。
-
-PC固有local diskは、共有不要かつ再生成可能な巨大cacheなどに限る例外です。どうしても使う場合は、PCごとの環境変数を`~/.research_env`へ追加し、tracked scriptへPC名や個別pathを直接書き込まない形を推奨します。
-
-```bash
-# ~/.research_envにPCごとに設定する例
-export SEPSIS_LOCAL_CACHE_ROOT="/mnt/e/SepsisAtlas/cache"  # WSL2
-# export SEPSIS_LOCAL_CACHE_ROOT="/Volumes/ExternalSSD/SepsisAtlas/cache"  # macOS
-
-# scripts/configure-workspace.sh側
-if [[ -n "${SEPSIS_LOCAL_CACHE_ROOT:-}" ]]; then
-  link_data "$SEPSIS_LOCAL_CACHE_ROOT" local_cache
-fi
-```
-
-反映：
-
-```bash
-setup-workspace
+```text
+workspace/research-output/metadata-audit/
+workspace/large-output/integration-v1/
 ```
 
 確認：
 
 ```bash
-find workspace -maxdepth 2 -type l -print -exec readlink {} \;
+find workspace -maxdepth 1 -type l -print -exec readlink {} \;
 ```
-
-AgentへDropbox全体やデータroot全体を見せず、必要なsubpathだけlinkします。
-
----
 
 # 6. 解析環境を作る
 
@@ -850,7 +799,7 @@ git status
 
 最後にworking treeがcleanであることを確認します。
 
-移動先でも必要な中間outputは、handoff直前までlocalに放置せず、原則としてDropbox上の共有outputへ保存します。既にlocal scratchへ作成した場合は、移動前にDropboxへ移し、共有pathと再生成方法を`handoffs/CURRENT.md`へ記録します。`~/scratch`、conda環境、Agent chat session、未commit変更は別PCへ移りません。
+移動先でも必要な中間outputは、`workspace/research-output/`または`workspace/large-output/`へ保存します。既にlocal scratchへ作成した場合は移動前に共有側へ移し、subdirectoryと再生成方法を`handoffs/CURRENT.md`へ記録します。`~/scratch`、conda環境、Agent chat session、未commit変更は別PCへ移りません。
 
 ### 移動先PC
 
@@ -953,7 +902,7 @@ git push origin --delete work/metadata-audit
 
 squash mergeではGitがlocal branchをmerge済みと判定せず、`--delete-branch`がbranchを残す場合があります。PRとmainへの反映を確認した後の手動削除方法は[`docs/WORKTREES.md`](docs/WORKTREES.md)を参照してください。
 
-未commit変更があるworktreeは削除されません。`workspace/output`がlocal scratchを指している場合、必要な成果物をDropboxへ保存済みかも削除前に確認します。
+未commit変更があるworktreeは削除されません。必要な成果物が`workspace/research-output/`または`workspace/large-output/`へ保存済みかも削除前に確認します。
 
 ## 8.8 独立review用worktree
 
@@ -1020,66 +969,36 @@ test → commit → push → PR/merge → main更新 → 各PCのworktree削除 
 
 # 10. 共有先とlocal-only領域
 
-## 原則
-
-永続化すべきfileについて、特定PCだけに存在する唯一のコピーを作りません。保存先は原則としてGitHubまたはDropboxです。
-
 ## GitHub
 
-- source code
-- R / Python / shell script
-- tests
-- docs
+- source code、tests、docs
 - `PROJECT.md`、`AGENTS.md`、`CLAUDE.md`
 - `handoffs/CURRENT.md`
-- 小さなmetadata、schema、manifest、quality-control summary
-- `environment.yml`などの環境再構築情報
-- データ取得・再生成手順
-- version管理する価値がある小さな解析結果
-
-Agentが作業開始時に読むべきMarkdownや規約は、必ずGitへcommitしてtask branchへ含めます。GitHub上にだけ新しい版があり、task branchへ取り込まれていない場合はlocal worktreeから見えないため、必要に応じて`origin/main`をmergeします。
+- manifest、schema、小さなmetadata、環境再構築情報
 
 ## Dropbox
 
-- 共有研究data
-- 論文、supplement、reference資料
-- Gitへ入れない大容量file
-- PC間で継続するために必要な中間成果物
-- 再生成コストが高い成果物
-- 最終解析結果、figure元data、release候補
+Agentが利用するDropbox領域はprojectごとの次の4つだけです。
 
-Dropboxの既存directory構造は変更せず、projectから必要なsubpathだけ`workspace/data/`または`workspace/output`へlinkします。
+```text
+Research/aicode/inout/<Project>
+Research/aicode/output/<Project>
+ForShareLargeData/aicode/input/<Project>
+ForShareLargeData/aicode/output/<Project>
+```
+
+必要なdataはこの中へコピーします。Dropbox内の既存研究directoryや他projectをAgentに直接探索させません。
 
 ## local-onlyとして許容するもの
 
 - credential、token、secret
 - conda/mamba環境本体
-- downloaded package cache
-- temporary file
-- 再生成可能なscratch・cache
-- worktree folderと`workspace/`のsymlink構造
+- package cache
+- temporary fileと再生成可能なscratch
+- worktree folderと`workspace/`のsymlink
 - 実行中processとAgent chat session
 
-標準local scratch：
-
-```text
-~/scratch/<Project>/<checkout-name>/
-```
-
-`workspace/scratch`と、共有先を指定していない`workspace/output`は、端末を替えると失われても再生成できるものだけに使います。
-
-## project固有local disk / HPC
-
-数百GB以上のdataやGPU/HPC処理の都合でlocal diskやHPCを使うことはあります。ただし、そこだけに永続成果物の唯一のコピーを置きません。
-
-- 入力dataの正本は可能な範囲でDropboxまたは正式な外部storageに置く。
-- local/HPC上のcopyは計算用replicaとして扱う。
-- 重要な中間・最終成果物はDropbox等へ回収する。
-- path、checksum、取得・再生成方法をGit管理文書へ記録する。
-
-全端末共通の固定local rootは作りません。PC固有pathが本当に必要な場合だけ、`~/.research_env`のproject固有環境変数を利用します。
-
----
+永続化すべき成果物の唯一のコピーをlocal-only領域へ残しません。HPCや外付けdiskを計算用に使った場合も、必要な成果物は4つの共有project directoryへ回収します。
 
 # 11. infraを更新する
 
@@ -1135,12 +1054,13 @@ git branch --show-current
 |---|---|
 | `bash scripts/bootstrap-ubuntu.sh` | WSL2 Ubuntuへ基本toolを導入 |
 | `bash scripts/bootstrap-macos.sh` | macOSへHomebrewと基本toolを導入 |
-| `bash scripts/setup-machine.sh` | Dropbox実体path、共通directory、commandを設定 |
+| `bash scripts/setup-machine.sh` | 4つの固定Dropbox AI root、共通directory、commandを設定 |
 | `new-project` | 新規projectを作成 |
 | `new-worktree` | sharedまたはAgent別worktreeを作成 |
 | `remove-worktree` | local worktreeを安全に削除し、必要ならlocal branchも削除 |
 | `setup-workspace` | `scripts/configure-workspace.sh`から`workspace/`を再構築 |
 | `research-doctor` | machineとprojectを診断 |
+| `verify-workspace-migration` | `.local/`廃止以降の基盤移行をread-onlyで検証 |
 | `install-coding-agents` | CodexとClaude Codeを導入 |
 | `setup-vscode` | OSに応じたVS Code extensionを導入 |
 | `setup-agent-defaults` | Codex gpt-5.6/xhigh、Claude stable/opus/xhighを設定 |
@@ -1155,6 +1075,7 @@ new-project --help
 new-worktree --help
 remove-worktree --help
 setup-workspace --help
+verify-workspace-migration --help
 install-miniforge --help
 install-coding-agents --help
 setup-vscode --help
@@ -1166,19 +1087,17 @@ setup-emacs --help
 
 # 13. 重要な注意
 
-`AGENTS.md`、`CLAUDE.md`、`PROJECT.md`はAgentへの指示であり、OS permissionやcontainerによる完全なsecurity boundaryではありません。
+`AGENTS.md`、`CLAUDE.md`、`PROJECT.md`はAgentへのルールであり、OS permissionによる完全なsandboxではありません。
 
 - Agentは対象repositoryまたはworktreeから起動する。
-- Dropbox root、`~/src` root、home directoryから起動しない。
-- 必要な入力だけ `workspace/data/` にlinkする。
+- Dropboxは4つの固定`workspace/` linkからのみ利用する。
+- Dropbox root、home directory、`~/src` root、他projectを探索させない。
+- `workspace/large-input/`は明示指示がない限り変更・削除しない。
+- linked directory全体の再帰探索は、完全inventoryが必要なtaskに限定する。
 - secret、token、`.env`をrepositoryへ置かない。
-- 入力データを直接変更させない。
-- commit、push、merge、rebaseは人間が差分確認後に行う。
-- Agent作業後は `git status` と `git diff` を確認する。
+- commit、push、merge、rebase、shared data削除は人間が差分確認後に行う。
 - 同じworktreeでCodexとClaude Codeを同時稼働させない。
-- 患者level dataや機密性の高い未公開データを外部modelへ直接渡さない。
-
----
+- 患者level dataや機密性の高い未公開dataを外部modelへ直接渡さない。
 
 # 14. 詳細文書
 

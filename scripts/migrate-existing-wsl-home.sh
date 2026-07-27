@@ -7,476 +7,229 @@ INFRA_ROOT="${HOME}/src/research-dev-infra"
 ALLOW_NON_WSL=0
 
 usage() {
-  cat <<'EOF'
+  cat <<'USAGE'
 Usage:
   migrate-existing-wsl-home.sh [--dry-run] [--apply]
                                [--dropbox-root PATH]
                                [--infra-root PATH]
                                [--force-non-wsl]
 
-Purpose:
-  Migrate an already configured WSL2 home directory to the current
-  research-dev-infra layout without modifying anything under ~/src.
+Migrate an existing WSL2 home setup without modifying project repositories
+under ~/src. Default behavior is --dry-run.
 
-Default behavior is --dry-run.
-
-Changes outside ~/src:
-  - Updates ~/.research_env to point directly to Dropbox.
-  - Ensures ~/.bashrc loads ~/.research_env and ~/.local/bin.
-  - Creates ~/worktrees, ~/scratch, and ~/.local/bin if missing.
-  - Removes only known/safe symlinks from the legacy ~/data-roots directory.
-  - Removes ~/data-roots itself only when it becomes empty.
-  - Refreshes the setup-workspace command symlink when the updated infra
-    repository is available.
-  - Removes the legacy setup-project-links command only when it is a symlink
-    into the specified research-dev-infra repository.
-
-It never modifies project repositories or files under ~/src.
-EOF
+The resulting shared roots are limited to:
+  Research/aicode/inout
+  Research/aicode/output
+  ForShareLargeData/aicode/input
+  ForShareLargeData/aicode/output
+USAGE
 }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --dry-run)
-      MODE="dry-run"
-      shift
-      ;;
-    --apply)
-      MODE="apply"
-      shift
-      ;;
+    --dry-run) MODE="dry-run"; shift ;;
+    --apply) MODE="apply"; shift ;;
     --dropbox-root)
       [[ $# -ge 2 ]] || { echo "ERROR: --dropbox-root requires a path" >&2; exit 2; }
-      DROPBOX_ROOT_ARG="$2"
-      shift 2
-      ;;
+      DROPBOX_ROOT_ARG="$2"; shift 2 ;;
     --infra-root)
       [[ $# -ge 2 ]] || { echo "ERROR: --infra-root requires a path" >&2; exit 2; }
-      INFRA_ROOT="$2"
-      shift 2
-      ;;
-    --force-non-wsl)
-      ALLOW_NON_WSL=1
-      shift
-      ;;
-    -h|--help)
-      usage
-      exit 0
-      ;;
-    *)
-      echo "ERROR: unknown option: $1" >&2
-      usage >&2
-      exit 2
-      ;;
+      INFRA_ROOT="$2"; shift 2 ;;
+    --force-non-wsl) ALLOW_NON_WSL=1; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "ERROR: unknown option: $1" >&2; usage >&2; exit 2 ;;
   esac
 done
 
-if [[ $ALLOW_NON_WSL -ne 1 ]]; then
-  if ! grep -qiE 'microsoft|wsl' /proc/version 2>/dev/null; then
-    echo "ERROR: this migration is intended for WSL2." >&2
-    echo "Use --force-non-wsl only for testing." >&2
-    exit 1
-  fi
+if [[ $ALLOW_NON_WSL -ne 1 ]] && ! grep -qiE 'microsoft|wsl' /proc/version 2>/dev/null; then
+  echo "ERROR: this migration is intended for WSL2." >&2
+  exit 1
 fi
 
-command -v python3 >/dev/null 2>&1 || {
-  echo "ERROR: python3 is required." >&2
-  exit 1
-}
+command -v python3 >/dev/null 2>&1 || { echo "ERROR: python3 is required." >&2; exit 1; }
 
 normalize_path() {
   python3 - "$1" <<'PY'
-import os
-import sys
+import os, sys
 print(os.path.abspath(os.path.expanduser(sys.argv[1])))
 PY
 }
 
 candidate_is_valid() {
-  local root="$1"
-  [[ -d "$root/Research" && -d "$root/ForShareLargeData" ]]
-}
-
-add_candidate() {
-  local root="$1"
-  [[ -n "$root" ]] || return 0
-  root="$(normalize_path "$root")"
-  local existing
-  for existing in "${CANDIDATES[@]:-}"; do
-    [[ "$existing" == "$root" ]] && return 0
-  done
-  CANDIDATES+=("$root")
+  [[ -d "$1/Research" && -d "$1/ForShareLargeData" ]]
 }
 
 CANDIDATES=()
+add_candidate() {
+  local value="${1:-}"
+  [[ -n "$value" ]] || return 0
+  value="$(normalize_path "$value")"
+  local existing
+  for existing in "${CANDIDATES[@]:-}"; do
+    [[ "$existing" == "$value" ]] && return 0
+  done
+  CANDIDATES+=("$value")
+}
 
 if [[ -n "$DROPBOX_ROOT_ARG" ]]; then
   add_candidate "$DROPBOX_ROOT_ARG"
 else
-  if [[ -n "${DROPBOX_ROOT:-}" ]]; then
-    add_candidate "$DROPBOX_ROOT"
-  fi
-  if [[ -n "${RESEARCH_ROOT:-}" ]]; then
-    add_candidate "$(dirname "$RESEARCH_ROOT")"
-  fi
-  if [[ -n "${LARGE_ROOT:-}" ]]; then
-    add_candidate "$(dirname "$LARGE_ROOT")"
-  fi
-
   if [[ -f "$HOME/.research_env" ]]; then
-    OLD_ENV_VALUES="$(bash -c '
-      set +u
-      source "$1" >/dev/null 2>&1 || true
-      printf "%s\n%s\n%s\n" \
-        "${DROPBOX_ROOT:-}" \
-        "${RESEARCH_ROOT:-}" \
-        "${LARGE_ROOT:-}"
-    ' _ "$HOME/.research_env")"
-
-    mapfile -t OLD_ENV_LINES <<< "$OLD_ENV_VALUES"
-    [[ -n "${OLD_ENV_LINES[0]:-}" ]] && add_candidate "${OLD_ENV_LINES[0]}"
-    [[ -n "${OLD_ENV_LINES[1]:-}" ]] && add_candidate "$(dirname "${OLD_ENV_LINES[1]}")"
-    [[ -n "${OLD_ENV_LINES[2]:-}" ]] && add_candidate "$(dirname "${OLD_ENV_LINES[2]}")"
+    # shellcheck disable=SC1090
+    source "$HOME/.research_env" || true
+    for value in \
+      "${DROPBOX_ROOT:-}" \
+      "${RESEARCH_ROOT:+$(dirname "$RESEARCH_ROOT")}" \
+      "${LARGE_ROOT:+$(dirname "$LARGE_ROOT")}" \
+      "${AICODE_RESEARCH_INOUT_ROOT:+$(dirname "$(dirname "$(dirname "$AICODE_RESEARCH_INOUT_ROOT")")")}"; do
+      add_candidate "$value"
+    done
   fi
-
-  if command -v cmd.exe >/dev/null 2>&1 && command -v wslpath >/dev/null 2>&1; then
-    WIN_PROFILE="$(cmd.exe /c 'echo %USERPROFILE%' 2>/dev/null | tr -d '\r' | tail -n 1 || true)"
-    if [[ -n "$WIN_PROFILE" && "$WIN_PROFILE" != '%USERPROFILE%' ]]; then
-      WSL_PROFILE="$(wslpath -u "$WIN_PROFILE" 2>/dev/null || true)"
-      [[ -n "$WSL_PROFILE" ]] && add_candidate "$WSL_PROFILE/Dropbox"
-    fi
+  if command -v cmd.exe >/dev/null 2>&1; then
+    win_user="$(cmd.exe /C 'echo %USERNAME%' 2>/dev/null | tr -d '\r' | tail -n 1)"
+    [[ -n "$win_user" ]] && add_candidate "/mnt/c/Users/$win_user/Dropbox"
   fi
-
-  shopt -s nullglob
-  for path in /mnt/c/Users/*/Dropbox; do
-    add_candidate "$path"
-  done
-  shopt -u nullglob
+  while IFS= read -r path; do add_candidate "$path"; done < <(find /mnt/c/Users -maxdepth 2 -type d -name Dropbox -print 2>/dev/null || true)
 fi
 
-VALID_CANDIDATES=()
+VALID=()
 for candidate in "${CANDIDATES[@]:-}"; do
-  if candidate_is_valid "$candidate"; then
-    VALID_CANDIDATES+=("$candidate")
-  fi
+  candidate_is_valid "$candidate" && VALID+=("$candidate")
 done
 
-if [[ ${#VALID_CANDIDATES[@]} -eq 0 ]]; then
-  echo "ERROR: could not find a Dropbox root containing both:" >&2
-  echo "  Research" >&2
-  echo "  ForShareLargeData" >&2
-  echo >&2
-  echo "Run again with:" >&2
-  echo "  $0 --dropbox-root /mnt/c/Users/<WindowsUser>/Dropbox --apply" >&2
+if [[ ${#VALID[@]} -ne 1 ]]; then
+  echo "ERROR: expected exactly one Dropbox root containing Research and ForShareLargeData." >&2
+  printf '  candidate: %s\n' "${VALID[@]:-<none>}" >&2
+  echo "Use --dropbox-root PATH." >&2
   exit 1
 fi
 
-if [[ ${#VALID_CANDIDATES[@]} -gt 1 && -z "$DROPBOX_ROOT_ARG" ]]; then
-  echo "ERROR: multiple Dropbox roots were detected:" >&2
-  printf '  %s\n' "${VALID_CANDIDATES[@]}" >&2
-  echo "Specify one with --dropbox-root." >&2
-  exit 1
+DROPBOX_ROOT_NEW="${VALID[0]}"
+AICODE_RESEARCH_INOUT_ROOT_NEW="$DROPBOX_ROOT_NEW/Research/aicode/inout"
+AICODE_RESEARCH_OUTPUT_ROOT_NEW="$DROPBOX_ROOT_NEW/Research/aicode/output"
+AICODE_LARGE_INPUT_ROOT_NEW="$DROPBOX_ROOT_NEW/ForShareLargeData/aicode/input"
+AICODE_LARGE_OUTPUT_ROOT_NEW="$DROPBOX_ROOT_NEW/ForShareLargeData/aicode/output"
+
+printf 'Mode:                    %s\n' "$MODE"
+printf 'Research in/out root:    %s\n' "$AICODE_RESEARCH_INOUT_ROOT_NEW"
+printf 'Research output root:    %s\n' "$AICODE_RESEARCH_OUTPUT_ROOT_NEW"
+printf 'Large input root:        %s\n' "$AICODE_LARGE_INPUT_ROOT_NEW"
+printf 'Large output root:       %s\n' "$AICODE_LARGE_OUTPUT_ROOT_NEW"
+printf 'Infra repository:        %s\n' "$INFRA_ROOT"
+
+echo
+cat <<'PLAN'
+Planned changes outside ~/src:
+  - Back up and update ~/.research_env.
+  - Remove legacy broad Dropbox variables managed by older infra versions.
+  - Ensure ~/.bashrc sources ~/.research_env and adds ~/.local/bin.
+  - Create ~/worktrees, ~/scratch, ~/.local/bin, and the four fixed Dropbox roots.
+  - Remove only known symlinks from ~/data-roots; preserve unexpected entries.
+  - Refresh setup-workspace and verifier command symlinks when available.
+PLAN
+
+if [[ "$MODE" == "dry-run" ]]; then
+  echo
+  printf 'No changes made. Apply with:\n  %q --apply --dropbox-root %q\n' "$0" "$DROPBOX_ROOT_NEW"
+  exit 0
 fi
 
-NEW_DROPBOX_ROOT="${VALID_CANDIDATES[0]}"
-NEW_RESEARCH_ROOT="$NEW_DROPBOX_ROOT/Research"
-NEW_LARGE_ROOT="$NEW_DROPBOX_ROOT/ForShareLargeData"
-NEW_SRC_ROOT="$HOME/src"
-NEW_WORKTREE_ROOT="$HOME/worktrees"
-NEW_SCRATCH_ROOT="$HOME/scratch"
+timestamp="$(date +%Y%m%d_%H%M%S)"
+[[ -f "$HOME/.research_env" ]] && cp "$HOME/.research_env" "$HOME/.research_env.backup.$timestamp"
+[[ -f "$HOME/.bashrc" ]] && cp "$HOME/.bashrc" "$HOME/.bashrc.backup.$timestamp"
 
-TMP_DIR="$(mktemp -d)"
-trap 'rm -rf "$TMP_DIR"' EXIT
+mkdir -p \
+  "$HOME/worktrees" \
+  "$HOME/scratch" \
+  "$HOME/.local/bin" \
+  "$AICODE_RESEARCH_INOUT_ROOT_NEW" \
+  "$AICODE_RESEARCH_OUTPUT_ROOT_NEW" \
+  "$AICODE_LARGE_INPUT_ROOT_NEW" \
+  "$AICODE_LARGE_OUTPUT_ROOT_NEW"
 
-ENV_TARGET="$HOME/.research_env"
-BASHRC_TARGET="$HOME/.bashrc"
-ENV_NEW="$TMP_DIR/research_env.new"
-BASHRC_NEW="$TMP_DIR/bashrc.new"
-
-python3 - \
-  "$ENV_TARGET" \
-  "$ENV_NEW" \
-  "$NEW_DROPBOX_ROOT" \
-  "$NEW_RESEARCH_ROOT" \
-  "$NEW_LARGE_ROOT" \
-  "$NEW_SRC_ROOT" \
-  "$NEW_WORKTREE_ROOT" \
-  "$NEW_SCRATCH_ROOT" <<'PY'
+python3 - "$HOME/.research_env" \
+  "$AICODE_RESEARCH_INOUT_ROOT_NEW" \
+  "$AICODE_RESEARCH_OUTPUT_ROOT_NEW" \
+  "$AICODE_LARGE_INPUT_ROOT_NEW" \
+  "$AICODE_LARGE_OUTPUT_ROOT_NEW" \
+  "$HOME/src" "$HOME/worktrees" "$HOME/scratch" <<'PY'
+import re, shlex, sys
 from pathlib import Path
-import re
-import sys
 
-source = Path(sys.argv[1])
-target = Path(sys.argv[2])
+path = Path(sys.argv[1])
 values = {
-    "DROPBOX_ROOT": sys.argv[3],
-    "RESEARCH_ROOT": sys.argv[4],
-    "LARGE_ROOT": sys.argv[5],
+    "AICODE_RESEARCH_INOUT_ROOT": sys.argv[2],
+    "AICODE_RESEARCH_OUTPUT_ROOT": sys.argv[3],
+    "AICODE_LARGE_INPUT_ROOT": sys.argv[4],
+    "AICODE_LARGE_OUTPUT_ROOT": sys.argv[5],
     "SRC_ROOT": sys.argv[6],
     "WORKTREE_ROOT": sys.argv[7],
     "SCRATCH_ROOT": sys.argv[8],
 }
-
-begin = "# >>> research-dev-infra managed environment >>>"
-end = "# <<< research-dev-infra managed environment <<<"
-managed_keys = set(values) | {
-    "DATA_ROOTS_DIR",
-    "LOCAL_ROOT",
-    "LOCAL_LARGE_ROOT",
+managed = set(values) | {
+    "DROPBOX_ROOT", "RESEARCH_ROOT", "LARGE_ROOT", "LOCAL_ROOT",
+    "LOCAL_LARGE_ROOT"
 }
-
-text = source.read_text() if source.exists() else ""
-lines = text.splitlines()
-out = []
-in_managed = False
-
-assignment = re.compile(
-    r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*="
-)
-
+lines = path.read_text().splitlines() if path.exists() else []
+pattern = re.compile(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=")
+kept = []
 for line in lines:
-    if line.strip() == begin:
-        in_managed = True
+    match = pattern.match(line)
+    if match and match.group(1) in managed:
         continue
-    if line.strip() == end:
-        in_managed = False
+    if line.strip() == "# Generated by research-dev-infra/scripts/setup-machine.sh":
         continue
-    if in_managed:
-        continue
-    match = assignment.match(line)
-    if match and match.group(1) in managed_keys:
-        continue
-    out.append(line)
-
-while out and not out[-1].strip():
-    out.pop()
-
-if out:
-    out.append("")
-
-out.append(begin)
+    kept.append(line)
+while kept and not kept[-1].strip():
+    kept.pop()
+result = ["# Managed shared roots for research-dev-infra"]
 for key, value in values.items():
-    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
-    out.append(f'export {key}="{escaped}"')
-out.append(end)
-out.append("")
-
-target.write_text("\n".join(out))
+    result.append(f"export {key}={shlex.quote(value)}")
+if kept:
+    result.extend(["", "# Preserved user-specific settings", *kept])
+path.write_text("\n".join(result) + "\n")
 PY
 
-python3 - "$BASHRC_TARGET" "$BASHRC_NEW" <<'PY'
-from pathlib import Path
-import sys
-
-source = Path(sys.argv[1])
-target = Path(sys.argv[2])
-text = source.read_text() if source.exists() else ""
-lines = text.splitlines()
-
-begin = "# >>> research-dev-infra shell integration >>>"
-end = "# <<< research-dev-infra shell integration <<<"
-legacy_lines = {
-    'export PATH="$HOME/.local/bin:$PATH"',
-    '[ -f "$HOME/.research_env" ] && source "$HOME/.research_env"',
-    'source "$HOME/.research_env"',
-}
-
-out = []
-in_managed = False
-for line in lines:
-    if line.strip() == begin:
-        in_managed = True
-        continue
-    if line.strip() == end:
-        in_managed = False
-        continue
-    if in_managed:
-        continue
-    if line.strip() in legacy_lines:
-        continue
-    out.append(line)
-
-while out and not out[-1].strip():
-    out.pop()
-
-if out:
-    out.append("")
-
-out.extend(
-    [
-        begin,
-        'export PATH="$HOME/.local/bin:$PATH"',
-        '[ -f "$HOME/.research_env" ] && source "$HOME/.research_env"',
-        end,
-        "",
-    ]
-)
-
-target.write_text("\n".join(out))
-PY
-
-LEGACY_ROOT="$HOME/data-roots"
-SETUP_WORKSPACE_SOURCE="$INFRA_ROOT/scripts/setup-workspace.sh"
-SETUP_WORKSPACE_LINK="$HOME/.local/bin/setup-workspace"
-LEGACY_COMMAND_LINK="$HOME/.local/bin/setup-project-links"
-LEGACY_COMMAND_SOURCE="$INFRA_ROOT/scripts/setup-project-links.sh"
-
-print_header() {
-  printf '\n== %s ==\n' "$1"
-}
-
-show_file_diff() {
-  local current="$1"
-  local proposed="$2"
-  if [[ -f "$current" ]]; then
-    diff -u "$current" "$proposed" || true
-  else
-    diff -u /dev/null "$proposed" || true
-  fi
-}
-
-safe_legacy_links=()
-unsafe_legacy_entries=()
-if [[ -d "$LEGACY_ROOT" && ! -L "$LEGACY_ROOT" ]]; then
-  shopt -s dotglob nullglob
-  for entry in "$LEGACY_ROOT"/*; do
-    name="$(basename "$entry")"
-    if [[ -L "$entry" ]]; then
-      target="$(readlink -f "$entry" 2>/dev/null || true)"
-      case "$name" in
-        Research|ForShareLargeData|Dropbox|LocalLarge)
-          safe_legacy_links+=("$entry")
-          ;;
-        *)
-          if [[ -n "$target" && "$target" == "$NEW_DROPBOX_ROOT"* ]]; then
-            safe_legacy_links+=("$entry")
-          else
-            unsafe_legacy_entries+=("$entry")
-          fi
-          ;;
-      esac
-    else
-      unsafe_legacy_entries+=("$entry")
-    fi
-  done
-  shopt -u dotglob nullglob
-elif [[ -L "$LEGACY_ROOT" ]]; then
-  unsafe_legacy_entries+=("$LEGACY_ROOT")
-fi
-
-print_header "Migration summary"
-echo "Mode:             $MODE"
-echo "Dropbox root:     $NEW_DROPBOX_ROOT"
-echo "Research root:    $NEW_RESEARCH_ROOT"
-echo "Large-data root:  $NEW_LARGE_ROOT"
-echo "Source root:      $NEW_SRC_ROOT"
-echo "Worktree root:    $NEW_WORKTREE_ROOT"
-echo "Scratch root:     $NEW_SCRATCH_ROOT"
-echo "Infra root:       $INFRA_ROOT"
-
-echo
-printf 'This script will not modify anything under: %s\n' "$HOME/src"
-
-print_header "Proposed ~/.research_env"
-show_file_diff "$ENV_TARGET" "$ENV_NEW"
-
-print_header "Proposed ~/.bashrc integration"
-show_file_diff "$BASHRC_TARGET" "$BASHRC_NEW"
-
-print_header "Legacy ~/data-roots cleanup"
-if [[ ! -e "$LEGACY_ROOT" && ! -L "$LEGACY_ROOT" ]]; then
-  echo "No legacy directory exists."
-else
-  if [[ ${#safe_legacy_links[@]} -gt 0 ]]; then
-    echo "The following symlinks are safe to remove:"
-    for entry in "${safe_legacy_links[@]}"; do
-      printf '  %s -> %s\n' "$entry" "$(readlink "$entry")"
-    done
-  else
-    echo "No safe legacy symlinks found."
-  fi
-
-  if [[ ${#unsafe_legacy_entries[@]} -gt 0 ]]; then
-    echo
-    echo "These entries will NOT be removed automatically:"
-    printf '  %s\n' "${unsafe_legacy_entries[@]}"
-  fi
-fi
-
-print_header "Command symlinks"
-if [[ -x "$SETUP_WORKSPACE_SOURCE" ]]; then
-  echo "Will link: $SETUP_WORKSPACE_LINK -> $SETUP_WORKSPACE_SOURCE"
-else
-  echo "Will not create setup-workspace: source script not found or not executable."
-  echo "Expected: $SETUP_WORKSPACE_SOURCE"
-fi
-
-if [[ -L "$LEGACY_COMMAND_LINK" ]]; then
-  current_target="$(readlink "$LEGACY_COMMAND_LINK")"
-  if [[ "$current_target" == "$LEGACY_COMMAND_SOURCE" || "$current_target" == "$INFRA_ROOT"/* ]]; then
-    echo "Will remove legacy command symlink: $LEGACY_COMMAND_LINK"
-  else
-    echo "Will keep unrelated legacy command symlink: $LEGACY_COMMAND_LINK -> $current_target"
-  fi
-fi
-
-if [[ "$MODE" == "dry-run" ]]; then
-  print_header "No changes applied"
-  echo "Review the output, then run:"
-  printf '  %q --apply --dropbox-root %q\n' "$0" "$NEW_DROPBOX_ROOT"
-  exit 0
-fi
-
-TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
-mkdir -p "$HOME/.local/bin" "$NEW_WORKTREE_ROOT" "$NEW_SCRATCH_ROOT"
-
-if [[ -f "$ENV_TARGET" ]]; then
-  cp -p "$ENV_TARGET" "$ENV_TARGET.backup.$TIMESTAMP"
-fi
-if [[ -f "$BASHRC_TARGET" ]]; then
-  cp -p "$BASHRC_TARGET" "$BASHRC_TARGET.backup.$TIMESTAMP"
-fi
-
-install -m 600 "$ENV_NEW" "$ENV_TARGET"
-install -m 644 "$BASHRC_NEW" "$BASHRC_TARGET"
-
-for entry in "${safe_legacy_links[@]}"; do
-  rm -- "$entry"
+for line in \
+  '[ -f "$HOME/.research_env" ] && source "$HOME/.research_env"' \
+  'export PATH="$HOME/.local/bin:$PATH"'; do
+  grep -Fqx "$line" "$HOME/.bashrc" 2>/dev/null || printf '\n%s\n' "$line" >> "$HOME/.bashrc"
 done
 
-if [[ -d "$LEGACY_ROOT" && ! -L "$LEGACY_ROOT" ]]; then
-  rmdir "$LEGACY_ROOT" 2>/dev/null || true
+legacy="$HOME/data-roots"
+if [[ -d "$legacy" && ! -L "$legacy" ]]; then
+  for name in Research ForShareLargeData Dropbox LocalLarge; do
+    entry="$legacy/$name"
+    if [[ -L "$entry" ]]; then
+      rm -f "$entry"
+    elif [[ -e "$entry" ]]; then
+      echo "WARNING: preserved unexpected legacy entry: $entry" >&2
+    fi
+  done
+  rmdir "$legacy" 2>/dev/null || echo "WARNING: ~/data-roots remains because it is not empty." >&2
+elif [[ -L "$legacy" ]]; then
+  echo "WARNING: preserved ~/data-roots because it is itself a symlink." >&2
 fi
 
-if [[ -x "$SETUP_WORKSPACE_SOURCE" ]]; then
-  rm -f "$SETUP_WORKSPACE_LINK"
-  ln -s "$SETUP_WORKSPACE_SOURCE" "$SETUP_WORKSPACE_LINK"
-fi
-
-if [[ -L "$LEGACY_COMMAND_LINK" ]]; then
-  current_target="$(readlink "$LEGACY_COMMAND_LINK")"
-  if [[ "$current_target" == "$LEGACY_COMMAND_SOURCE" || "$current_target" == "$INFRA_ROOT"/* ]]; then
-    rm -- "$LEGACY_COMMAND_LINK"
+for pair in setup-workspace:setup-workspace.sh verify-workspace-migration:verify-workspace-migration.sh research-doctor:doctor.sh; do
+  name="${pair%%:*}"
+  script="${pair#*:}"
+  source_path="$INFRA_ROOT/scripts/$script"
+  target_path="$HOME/.local/bin/$name"
+  if [[ -f "$source_path" ]]; then
+    [[ -L "$target_path" ]] && rm -f "$target_path"
+    if [[ -e "$target_path" ]]; then
+      echo "WARNING: preserved non-symlink command: $target_path" >&2
+    else
+      ln -s "$source_path" "$target_path"
+    fi
   fi
-fi
+done
 
-print_header "Migration complete"
-echo "Backups, when applicable:"
-echo "  $ENV_TARGET.backup.$TIMESTAMP"
-echo "  $BASHRC_TARGET.backup.$TIMESTAMP"
-echo
-echo "Reload the shell configuration:"
-echo "  source ~/.bashrc"
-echo "  hash -r"
-echo
-echo "Verify:"
-echo "  printf 'RESEARCH_ROOT=%s\\n' \"\$RESEARCH_ROOT\""
-echo "  printf 'LARGE_ROOT=%s\\n' \"\$LARGE_ROOT\""
-echo "  command -v setup-workspace"
-echo "  test ! -e ~/data-roots && echo 'legacy data-roots removed'"
+old_command="$HOME/.local/bin/setup-project-links"
+[[ -L "$old_command" ]] && rm -f "$old_command"
 
-if [[ ${#unsafe_legacy_entries[@]} -gt 0 ]]; then
-  echo
-  echo "WARNING: ~/data-roots still contains entries that were not removed."
-  echo "Inspect them manually before deleting anything."
-fi
+echo
+echo "Migration applied."
+echo "Run: source ~/.bashrc && hash -r"
+echo "Then: verify-workspace-migration"
